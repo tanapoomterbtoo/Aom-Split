@@ -60,8 +60,46 @@
   }
 
   function getQuery(name) {
-    const u = new URL(location.href);
-    return u.searchParams.get(name);
+    try {
+      const u = new URL(location.href);
+      const v = u.searchParams.get(name);
+      if (v != null && v !== "") return v;
+    } catch (e) {
+      /* fall through */
+    }
+    // Fallback for odd environments
+    const q = (location.search || "").replace(/^\?/, "");
+    const parts = q.split("&");
+    for (let i = 0; i < parts.length; i++) {
+      const kv = parts[i].split("=");
+      if (decodeURIComponent(kv[0] || "") === name) {
+        return decodeURIComponent((kv[1] || "").replace(/\+/g, " "));
+      }
+    }
+    return null;
+  }
+
+  /** Build URL to a sibling page in the same folder (works on GitHub Pages /Aom-Split/) */
+  function pageUrl(file, params) {
+    const path = location.pathname || "/";
+    const dir = /\/$/.test(path) ? path : path.replace(/\/[^/]*$/, "/");
+    let url = dir + file;
+    if (params && typeof params === "object") {
+      const qs = Object.keys(params)
+        .filter(function (k) {
+          return params[k] != null && params[k] !== "";
+        })
+        .map(function (k) {
+          return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+        })
+        .join("&");
+      if (qs) url += "?" + qs;
+    }
+    return url;
+  }
+
+  function go(file, params) {
+    location.href = pageUrl(file, params);
   }
 
   function copyText(text) {
@@ -128,6 +166,8 @@
     memberColor: memberColor,
     avatar: avatar,
     getQuery: getQuery,
+    pageUrl: pageUrl,
+    go: go,
     copyText: copyText,
     buildShareText: buildShareText,
   };

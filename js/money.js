@@ -85,17 +85,18 @@
     const amount = satang(expense.amountMinor);
     const mode = expense.splitMode || "equal";
     let participants = (expense.participants || []).slice();
+    const paidBy = expense.paidByMemberId;
 
     if (mode === "treat") {
-      // host absorbs 100%; if paidBy is host, net 0 for this line overall for others
-      const host = expense.paidByMemberId;
+      const host = paidBy;
       const o = {};
-      o[host] = amount;
+      if (host) o[host] = amount;
       return o;
     }
 
     if (mode === "equal") {
-      if (!participants.length) throw new Error("equal ต้องมี participants");
+      if (!participants.length && paidBy) participants = [paidBy];
+      if (!participants.length) return {};
       const w = {};
       participants.forEach(function (id) {
         w[id] = 1;
@@ -109,12 +110,18 @@
       participants.forEach(function (id) {
         if ((shares[id] || 0) > 0) w[id] = shares[id];
       });
-      // if participants empty, use all keys in shares
       if (!Object.keys(w).length) {
         Object.keys(shares).forEach(function (id) {
           if (shares[id] > 0) w[id] = shares[id];
         });
       }
+      if (!Object.keys(w).length) {
+        if (!participants.length && paidBy) participants = [paidBy];
+        participants.forEach(function (id) {
+          w[id] = 1;
+        });
+      }
+      if (!Object.keys(w).length) return {};
       return splitByWeights(amount, w);
     }
 
@@ -124,30 +131,41 @@
       let sum = 0;
       Object.keys(exact).forEach(function (id) {
         const v = satang(exact[id]);
-        if (v > 0) {
+        if (v !== 0) {
           o[id] = v;
           sum += v;
         }
       });
-      if (sum !== amount) {
-        throw new Error(
-          "exact ต้องรวมเท่ากับยอดรายการ (ได้ " + sum + " ต้องการ " + amount + ")"
-        );
+      // ถ้า exact ไม่ครบยอด — กระจายส่วนต่างให้ paidBy (กันหน้าสรุปพัง)
+      if (sum !== amount && paidBy) {
+        o[paidBy] = satang((o[paidBy] || 0) + (amount - sum));
       }
       return o;
     }
 
     if (mode === "percent") {
       const percents = expense.percents || {};
-      // treat percent points as weights; must sum ~100
       const w = {};
       Object.keys(percents).forEach(function (id) {
         if (percents[id] > 0) w[id] = percents[id];
       });
+      if (!Object.keys(w).length) {
+        if (!participants.length && paidBy) participants = [paidBy];
+        participants.forEach(function (id) {
+          w[id] = 1;
+        });
+      }
+      if (!Object.keys(w).length) return {};
       return splitByWeights(amount, w);
     }
 
-    throw new Error("splitMode ไม่รู้จัก: " + mode);
+    // unknown mode → โยนให้คนจ่าย (ไม่ throw)
+    if (paidBy) {
+      const o = {};
+      o[paidBy] = amount;
+      return o;
+    }
+    return {};
   }
 
   /**
@@ -171,15 +189,21 @@
 
     expenses.forEach(function (e) {
       if (e.deleted) return;
-      const amount = satang(e.amountMinor);
-      if (!paid.hasOwnProperty(e.paidByMemberId)) paid[e.paidByMemberId] = 0;
-      paid[e.paidByMemberId] += amount;
+      try {
+        const amount = satang(e.amountMinor);
+        if (e.paidByMemberId) {
+          if (!paid.hasOwnProperty(e.paidByMemberId)) paid[e.paidByMemberId] = 0;
+          paid[e.paidByMemberId] += amount;
+        }
 
-      const parts = resolveSplits(e);
-      Object.keys(parts).forEach(function (id) {
-        if (!owed.hasOwnProperty(id)) owed[id] = 0;
-        owed[id] += satang(parts[id]);
-      });
+        const parts = resolveSplits(e);
+        Object.keys(parts).forEach(function (id) {
+          if (!owed.hasOwnProperty(id)) owed[id] = 0;
+          owed[id] += satang(parts[id]);
+        });
+      } catch (err) {
+        console.warn("skip expense", e && e.id, err);
+      }
     });
 
     const balances = {};

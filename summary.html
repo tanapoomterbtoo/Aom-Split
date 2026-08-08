@@ -100,17 +100,37 @@
 
   <script>
     (function () {
+      function showFatal(msg) {
+        const main = document.querySelector("main.container");
+        if (main) {
+          main.innerHTML =
+            '<div class="card empty">' +
+            '<div style="font-size:2rem;margin-bottom:0.5rem;">⚠️</div>' +
+            '<div style="font-weight:700;margin-bottom:0.5rem;">เปิดหน้าสรุปไม่สำเร็จ</div>' +
+            '<p class="muted" style="margin-bottom:1rem;">' +
+            String(msg || "") +
+            "</p>" +
+            '<a class="btn btn-primary" href="' +
+            AomUI.pageUrl("index.html") +
+            '">กลับหน้าแรก</a>' +
+            "</div>";
+        }
+      }
+
       // 1. Get Session ID from query param
       const id = AomUI.getQuery("id");
       if (!id) {
-        location.href = "index.html";
+        // อย่าเด้งเงียบๆ — บอกเหตุผล (ลิงก์ไม่มี id)
+        showFatal("ลิงก์ไม่มีรหัสทริป (id) · กลับไปเปิดจากแท็บรายการในทริปอีกครั้ง");
         return;
       }
 
       // 2. Load Session from store
       let session = AomStore.getSession(id);
       if (!session) {
-        location.href = "index.html";
+        showFatal(
+          "ไม่พบทริปนี้ในเครื่อง · อาจอยู่คนละเบราว์เซอร์ หรือข้อมูลถูกล้าง · ลองกลับหน้าแรก"
+        );
         return;
       }
 
@@ -129,13 +149,20 @@
 
       // 3. Configure Navigation Tabs with Session ID
       const tabItems = document.getElementById("tab-items");
-      if (tabItems) tabItems.href = "session.html?id=" + encodeURIComponent(id);
+      if (tabItems) {
+        tabItems.href = AomUI.pageUrl("session.html", { id: id });
+        tabItems.addEventListener("click", function (e) {
+          e.preventDefault();
+          AomUI.go("session.html", { id: id });
+        });
+      }
 
       const tabSummary = document.getElementById("tab-summary");
-      if (tabSummary) tabSummary.href = "summary.html?id=" + encodeURIComponent(id);
+      if (tabSummary) tabSummary.href = AomUI.pageUrl("summary.html", { id: id });
 
       // 4. Render Summary Page
       function render() {
+        try {
         // Refresh session data from store in case of updates
         session = AomStore.getSession(id) || session;
         const plan = AomMoney.recompute(session);
@@ -264,35 +291,51 @@
           btn.addEventListener("click", function () {
             const key = btn.getAttribute("data-key");
             const targetDone = btn.getAttribute("data-done") === "true";
-            AomStore.markTransfer(session.id, key, targetDone);
+            try {
+              AomStore.markTransfer(session.id, key, targetDone);
+            } catch (err) {
+              AomUI.toast((err && err.message) || "บันทึกไม่สำเร็จ");
+            }
             render();
           });
         });
+        } catch (err) {
+          console.error(err);
+          showFatal("คำนวณสรุปไม่สำเร็จ: " + ((err && err.message) || err));
+        }
       }
 
       // 5. Share Functions
       function shareAll() {
-        const plan = AomMoney.recompute(session);
-        const shareText = AomUI.buildShareText(session, plan);
-        AomUI.copyText(shareText);
+        try {
+          const plan = AomMoney.recompute(session);
+          const shareText = AomUI.buildShareText(session, plan);
+          AomUI.copyText(shareText);
+        } catch (err) {
+          AomUI.toast((err && err.message) || "แชร์ไม่สำเร็จ");
+        }
       }
 
       function copyTransfersOnly() {
-        const plan = AomMoney.recompute(session);
-        if (!plan.transfers || !plan.transfers.length) {
-          AomUI.copyText("✅ ลงตัวแล้ว ไม่ต้องโอนเพิ่ม");
-          return;
+        try {
+          const plan = AomMoney.recompute(session);
+          if (!plan.transfers || !plan.transfers.length) {
+            AomUI.copyText("✅ ลงตัวแล้ว ไม่ต้องโอนเพิ่ม");
+            return;
+          }
+          const lines = plan.transfers.map(function (t) {
+            return (
+              AomUI.memberName(session, t.from) +
+              " → " +
+              AomUI.memberName(session, t.to) +
+              " " +
+              AomMoney.formatMoney(t.amountMinor)
+            );
+          });
+          AomUI.copyText("— รายการโอน —\n" + lines.join("\n"));
+        } catch (err) {
+          AomUI.toast((err && err.message) || "คัดลอกไม่สำเร็จ");
         }
-        const lines = plan.transfers.map(function (t) {
-          return (
-            AomUI.memberName(session, t.from) +
-            " → " +
-            AomUI.memberName(session, t.to) +
-            " " +
-            AomMoney.formatMoney(t.amountMinor)
-          );
-        });
-        AomUI.copyText("— รายการโอน —\n" + lines.join("\n"));
       }
 
       // Bind buttons

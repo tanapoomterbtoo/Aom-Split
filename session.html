@@ -210,7 +210,7 @@
       <button type="button" id="tab-btn-members" onclick="switchTab('members')">
         สมาชิก (<span id="tab-count-members">0</span>)
       </button>
-      <a id="tab-link-summary" href="summary.html" class="tabs-link" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;">
+      <a id="tab-link-summary" href="#" class="tabs-link" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;" role="button">
         สรุปโอน ⚡
       </a>
     </nav>
@@ -365,13 +365,14 @@
     document.addEventListener('DOMContentLoaded', function () {
       const sessionId = AomUI.getQuery('id');
       if (!sessionId) {
-        location.href = 'index.html';
+        AomUI.go('index.html');
         return;
       }
 
       currentSession = AomStore.getSession(sessionId);
       if (!currentSession) {
-        location.href = 'index.html';
+        AomUI.toast('ไม่พบทริปนี้');
+        AomUI.go('index.html');
         return;
       }
 
@@ -399,10 +400,21 @@
         }, 1600);
       });
 
-      // Update link to summary
+      // Update link to summary (must keep ?id= or page bounces home)
       const summaryLink = document.getElementById('tab-link-summary');
       if (summaryLink) {
-        summaryLink.href = 'summary.html?id=' + encodeURIComponent(currentSession.id);
+        const summaryHref = AomUI.pageUrl('summary.html', { id: currentSession.id });
+        summaryLink.href = summaryHref;
+        summaryLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          // บันทึก state ล่าสุดก่อนไปหน้าสรุป
+          try {
+            AomStore.upsertSession(currentSession);
+          } catch (err) {
+            /* continue anyway */
+          }
+          AomUI.go('summary.html', { id: currentSession.id });
+        });
       }
 
       // Setup Session Title Listener (auto-save on change + debounce while typing)
