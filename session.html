@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260808d"></script>
+  <script src="js/boot.js?v=20260808e"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260808d">
+  <link rel="stylesheet" href="css/app.css?v=20260808e">
   <style>
     .session-title-input {
       background: transparent;
@@ -274,6 +274,7 @@
           <h2 style="margin:0;font-size:1.1rem;">💸 ใครต้องโอนใคร</h2>
           <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;">
             ยอดสุทธิ = จ่ายจริง − ส่วนที่กิน
+            · <span id="summary-build-label" class="badge">…</span>
           </p>
         </div>
         <div id="plan-status-badge"></div>
@@ -376,9 +377,10 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260808d"></script>
-  <script src="js/store.js?v=20260808d"></script>
-  <script src="js/ui.js?v=20260808d"></script>
+  <script src="js/money.js?v=20260808e"></script>
+  <script src="js/store.js?v=20260808e"></script>
+  <script src="js/ui.js?v=20260808e"></script>
+  <script src="js/summary-view.js?v=20260808e"></script>
 
   <script>
     // App State
@@ -567,124 +569,27 @@
       }
     }
 
-    function escapeAttr(str) {
-      return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
     function renderSummary() {
       if (!currentSession) return;
-      const membersBox = document.getElementById('summary-members-list');
-      const transfersBox = document.getElementById('summary-transfers-list');
-      const badgeEl = document.getElementById('plan-status-badge');
-      if (!membersBox || !transfersBox) return;
-
-      let plan;
-      try {
-        plan = AomMoney.recompute(currentSession);
-      } catch (err) {
-        membersBox.innerHTML = '<div class="muted">คำนวณไม่สำเร็จ: ' + escapeHtml(err && err.message) + '</div>';
-        transfersBox.innerHTML = '';
+      if (!window.AomSummaryView || typeof AomSummaryView.render !== 'function') {
+        var box = document.getElementById('summary-transfers-list');
+        if (box) {
+          box.textContent = 'โหลดโมดูลสรุปไม่สำเร็จ — รีเฟรชหน้า (build ใหม่)';
+        }
         return;
       }
-
-      if (badgeEl) {
-        badgeEl.innerHTML = plan.ok
-          ? '<span class="badge ok">✓ ยอดสมดุล</span>'
-          : '<span class="badge warn">⚠️ ไม่สมดุล (' + AomMoney.formatSigned(plan.sumCheck) + ')</span>';
-      }
-
-      const members = currentSession.members || [];
-      if (!members.length) {
-        membersBox.innerHTML = '<div class="empty">ยังไม่มีสมาชิก</div>';
-      } else {
-        membersBox.innerHTML = members.map(function (m) {
-          const owed = plan.owed[m.id] || 0;
-          const paid = plan.paid[m.id] || 0;
-          const bal = plan.balances[m.id] || 0;
-          let balClass = 'money';
-          let status = '<span class="badge">ลงตัว</span>';
-          if (bal > 0) {
-            balClass = 'money pos';
-            status = '<span class="badge ok">ได้คืน</span>';
-          } else if (bal < 0) {
-            balClass = 'money neg';
-            status = '<span class="badge warn">ต้องโอน</span>';
-          }
-          return (
-            '<div style="padding:0.75rem 0;border-bottom:1px solid var(--border);">' +
-              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.45rem;">' +
-                '<div style="display:flex;align-items:center;gap:0.55rem;">' +
-                  AomUI.avatar(currentSession, m.id, 32) +
-                  '<strong>' + escapeHtml(m.displayName) + '</strong>' +
-                '</div>' + status +
-              '</div>' +
-              '<div class="stat-row">' +
-                '<div class="s"><div class="l">กิน</div><div class="v money">' + AomMoney.formatMoney(owed) + '</div></div>' +
-                '<div class="s"><div class="l">จ่าย</div><div class="v money">' + AomMoney.formatMoney(paid) + '</div></div>' +
-                '<div class="s"><div class="l">สุทธิ</div><div class="v ' + balClass + '">' + AomMoney.formatSigned(bal) + '</div></div>' +
-              '</div>' +
-            '</div>'
-          );
-        }).join('');
-      }
-
-      if (!plan.transfers || !plan.transfers.length) {
-        transfersBox.innerHTML =
-          '<div class="card empty">' +
-          '<div style="font-size:2rem;margin-bottom:0.35rem;">🎉</div>' +
-          '<div style="font-weight:700;color:var(--good);">ลงตัวแล้ว</div>' +
-          '<div class="muted" style="font-size:0.88rem;">ไม่ต้องโอนเพิ่ม</div>' +
-          '</div>';
-        return;
-      }
-
-      transfersBox.innerHTML = plan.transfers.map(function (t, idx) {
-        const fromName = AomUI.memberName(currentSession, t.from);
-        const toName = AomUI.memberName(currentSession, t.to);
-        const amtStr = AomMoney.formatMoney(t.amountMinor);
-        const tKey = AomStore.transferKey(t);
-        const isDone = !!(currentSession.transferMarks && currentSession.transferMarks[tKey] && currentSession.transferMarks[tKey].done);
-        // ใช้ data-* + listener — ห้ามใส่ JSON ใน onclick="..." (เครื่องหมาย " ซ้อนแล้ว HTML แตก)
-        return (
-          '<div class="card transfer-card' + (isDone ? ' done' : '') + '" style="margin-bottom:0.65rem;">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">' +
-              '<div style="display:flex;align-items:center;gap:0.4rem;font-weight:700;flex-wrap:wrap;">' +
-                AomUI.avatar(currentSession, t.from, 28) +
-                '<span>' + escapeHtml(fromName) + '</span>' +
-                '<span style="color:var(--muted)">→</span>' +
-                AomUI.avatar(currentSession, t.to, 28) +
-                '<span>' + escapeHtml(toName) + '</span>' +
-              '</div>' +
-              (isDone ? '<span class="badge ok">✓ โอนแล้ว</span>' : '') +
-            '</div>' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-top:0.65rem;flex-wrap:wrap;">' +
-              '<div class="money big">' + amtStr + '</div>' +
-              '<div class="btn-row">' +
-                '<button type="button" class="btn btn-sm btn-copy-transfer" data-idx="' + idx + '">📋 คัดลอก</button>' +
-                '<button type="button" class="btn btn-sm btn-mark-transfer ' + (isDone ? 'btn-ghost' : 'btn-primary') + '" data-key="' + escapeAttr(tKey) + '" data-done="' + (isDone ? '1' : '0') + '">' +
-                  (isDone ? 'ยกเลิก' : '✓ โอนแล้ว') +
-                '</button>' +
-              '</div>' +
-            '</div>' +
-          '</div>'
-        );
-      }).join('');
-
-      transfersBox.querySelectorAll('.btn-copy-transfer').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var idx = parseInt(btn.getAttribute('data-idx'), 10);
+      AomSummaryView.render({
+        session: currentSession,
+        membersBox: document.getElementById('summary-members-list'),
+        transfersBox: document.getElementById('summary-transfers-list'),
+        badgeEl: document.getElementById('plan-status-badge'),
+        versionEl: document.getElementById('summary-build-label'),
+        onCopyOne: function (idx) {
           copyOneTransfer(idx);
-        });
-      });
-      transfersBox.querySelectorAll('.btn-mark-transfer').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var key = btn.getAttribute('data-key') || '';
-          var currentlyDone = btn.getAttribute('data-done') === '1';
-          toggleTransferDone(key, !currentlyDone);
-        });
+        },
+        onToggleDone: function (key, nextDone) {
+          toggleTransferDone(key, nextDone);
+        },
       });
     }
 

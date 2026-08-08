@@ -172,7 +172,24 @@
   }
 
   function transferKey(t) {
-    return t.from + "->" + t.to + ":" + t.amountMinor;
+    // avoid "->" / quotes (HTML-unsafe in attributes / old marks)
+    return String(t.from) + "__" + String(t.to) + "__" + String(t.amountMinor);
+  }
+
+  /** Accept legacy keys "from->to:amount" when reading marks */
+  function transferKeyAliases(t) {
+    var modern = transferKey(t);
+    var legacy = String(t.from) + "->" + String(t.to) + ":" + String(t.amountMinor);
+    return [modern, legacy];
+  }
+
+  function isTransferMarked(session, t) {
+    var marks = (session && session.transferMarks) || {};
+    var keys = transferKeyAliases(t);
+    for (var i = 0; i < keys.length; i++) {
+      if (marks[keys[i]] && marks[keys[i]].done) return true;
+    }
+    return false;
   }
 
   /** Full backup object for export */
@@ -284,6 +301,8 @@
     createSession: createSession,
     markTransfer: markTransfer,
     transferKey: transferKey,
+    transferKeyAliases: transferKeyAliases,
+    isTransferMarked: isTransferMarked,
     isStorageAvailable: isStorageAvailable,
     exportData: exportData,
     exportJsonString: exportJsonString,
