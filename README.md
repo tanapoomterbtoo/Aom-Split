@@ -63,8 +63,8 @@ npx --yes serve .
 ```text
 .
 ├── index.html      # รายการทริป / สร้างใหม่
-├── session.html    # สมาชิก + รายการจ่าย
-├── summary.html    # ยอดต่อคน + รายการโอน
+├── session.html    # รายการ · สมาชิก · สรุปโอน (แท็บในหน้าเดียว)
+├── summary.html    # redirect → session.html?tab=summary
 ├── css/app.css     # UI มือถือ dark theme
 ├── js/
 │   ├── money.js    # คำนวณเงิน (สตางค์) + settle
