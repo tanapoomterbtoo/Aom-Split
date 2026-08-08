@@ -10,7 +10,7 @@
   }
 
   function toast(msg) {
-    let el = document.getElementById("aom-toast");
+    var el = document.getElementById("aom-toast");
     if (!el) {
       el = document.createElement("div");
       el.id = "aom-toast";
@@ -26,14 +26,14 @@
   }
 
   function memberName(session, id) {
-    const m = (session.members || []).find(function (x) {
+    var m = (session.members || []).find(function (x) {
       return x.id === id;
     });
     return m ? m.displayName : id;
   }
 
   function memberColor(session, id) {
-    const m = (session.members || []).find(function (x) {
+    var m = (session.members || []).find(function (x) {
       return x.id === id;
     });
     return (m && m.color) || "#888";
@@ -41,9 +41,9 @@
 
   function avatar(session, id, size) {
     size = size || 32;
-    const name = memberName(session, id);
-    const color = memberColor(session, id);
-    const initial = name.charAt(0);
+    var name = memberName(session, id);
+    var color = memberColor(session, id);
+    var initial = (name && name.charAt(0)) || "?";
     return (
       '<span class="avatar" style="width:' +
       size +
@@ -52,7 +52,7 @@
       "px;background:" +
       color +
       '" title="' +
-      name +
+      String(name).replace(/"/g, "&quot;") +
       '">' +
       initial +
       "</span>"
@@ -61,17 +61,16 @@
 
   function getQuery(name) {
     try {
-      const u = new URL(location.href);
-      const v = u.searchParams.get(name);
+      var u = new URL(location.href);
+      var v = u.searchParams.get(name);
       if (v != null && v !== "") return v;
     } catch (e) {
       /* fall through */
     }
-    // Fallback for odd environments
-    const q = (location.search || "").replace(/^\?/, "");
-    const parts = q.split("&");
-    for (let i = 0; i < parts.length; i++) {
-      const kv = parts[i].split("=");
+    var q = (location.search || "").replace(/^\?/, "");
+    var parts = q.split("&");
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].split("=");
       if (decodeURIComponent(kv[0] || "") === name) {
         return decodeURIComponent((kv[1] || "").replace(/\+/g, " "));
       }
@@ -79,55 +78,123 @@
     return null;
   }
 
-  /** Build URL to a sibling page in the same folder (works on GitHub Pages /Aom-Split/) */
+  /**
+   * Directory of current page, always ends with /
+   * Fixes GitHub Pages case: pathname "/Aom-Split" (no trailing slash)
+   * must NOT become "/" 
+   */
+  function currentDir() {
+    try {
+      var path = location.pathname || "/";
+      var segments = path.split("/");
+      var last = segments[segments.length - 1] || "";
+      var looksLikeFile = last.indexOf(".") !== -1;
+
+      if (path.endsWith("/")) {
+        return path;
+      }
+      if (looksLikeFile) {
+        // /Aom-Split/index.html -> /Aom-Split/
+        return path.replace(/\/[^/]*$/, "/") || "/";
+      }
+      // /Aom-Split  (project root without slash) -> /Aom-Split/
+      return path + "/";
+    } catch (e) {
+      return "./";
+    }
+  }
+
+  /** Relative or root-path URL to a file next to the app */
   function pageUrl(file, params) {
-    const path = location.pathname || "/";
-    const dir = /\/$/.test(path) ? path : path.replace(/\/[^/]*$/, "/");
-    let url = dir + file;
+    file = String(file || "").replace(/^\.\//, "");
+    // Prefer simple relative name — browser resolves against current directory URL
+    // But when pathname is "/repo" without slash, relative breaks; so use absolute path from currentDir()
+    var url = currentDir() + file;
     if (params && typeof params === "object") {
-      const qs = Object.keys(params)
-        .filter(function (k) {
-          return params[k] != null && params[k] !== "";
-        })
-        .map(function (k) {
-          return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
-        })
-        .join("&");
-      if (qs) url += "?" + qs;
+      var qs = [];
+      Object.keys(params).forEach(function (k) {
+        if (params[k] != null && params[k] !== "") {
+          qs.push(encodeURIComponent(k) + "=" + encodeURIComponent(params[k]));
+        }
+      });
+      if (qs.length) url += "?" + qs.join("&");
     }
     return url;
   }
 
   function go(file, params) {
-    location.href = pageUrl(file, params);
+    var target = pageUrl(file, params);
+    // location.assign is more predictable than href setter on some mobile browsers
+    try {
+      location.assign(target);
+    } catch (e) {
+      location.href = target;
+    }
+  }
+
+  /**
+   * If opened as https://user.github.io/Aom-Split (no trailing slash),
+   * normalize to .../Aom-Split/ so relative links keep working.
+   */
+  function ensureTrailingSlashForDir() {
+    try {
+      var path = location.pathname || "";
+      var last = path.split("/").pop() || "";
+      var looksLikeFile = last.indexOf(".") !== -1;
+      if (path && !path.endsWith("/") && !looksLikeFile) {
+        location.replace(
+          path + "/" + (location.search || "") + (location.hash || "")
+        );
+        return true;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    return false;
   }
 
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).then(function () {
-        toast("คัดลอกแล้ว");
-      });
+      return navigator.clipboard.writeText(text).then(
+        function () {
+          toast("คัดลอกแล้ว");
+        },
+        function () {
+          fallbackCopy(text);
+        }
+      );
     }
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-    toast("คัดลอกแล้ว");
+    fallbackCopy(text);
     return Promise.resolve();
   }
 
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      toast("คัดลอกแล้ว");
+    } catch (e) {
+      toast("คัดลอกไม่สำเร็จ");
+    }
+    document.body.removeChild(ta);
+  }
+
   function buildShareText(session, plan) {
-    const lines = [];
-    lines.push("🍺 " + session.title);
+    var lines = [];
+    lines.push("🍺 " + (session.title || "ทริป"));
     lines.push("วันที่ " + (session.date || ""));
     lines.push("");
     lines.push("— ยอดต่อคน —");
     (session.members || []).forEach(function (m) {
-      const paid = plan.paid[m.id] || 0;
-      const owed = plan.owed[m.id] || 0;
-      const bal = plan.balances[m.id] || 0;
+      var paid = plan.paid[m.id] || 0;
+      var owed = plan.owed[m.id] || 0;
+      var bal = plan.balances[m.id] || 0;
       lines.push(
         m.displayName +
           ": กิน " +
@@ -139,7 +206,7 @@
       );
     });
     lines.push("");
-    if (!plan.transfers.length) {
+    if (!plan.transfers || !plan.transfers.length) {
       lines.push("✅ ลงตัว ไม่ต้องโอนเพิ่ม");
     } else {
       lines.push("— ต้องโอน —");
@@ -166,8 +233,10 @@
     memberColor: memberColor,
     avatar: avatar,
     getQuery: getQuery,
+    currentDir: currentDir,
     pageUrl: pageUrl,
     go: go,
+    ensureTrailingSlashForDir: ensureTrailingSlashForDir,
     copyText: copyText,
     buildShareText: buildShareText,
   };

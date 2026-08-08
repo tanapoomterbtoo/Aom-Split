@@ -6,3 +6,7 @@ Thumbs.db
 *.swp
 node_modules/
 .cache/
+package.json
+package-lock.json
+playwright-report/
+test-results/

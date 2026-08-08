@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  <script src="js/boot.js?v=20260808c"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -8,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/app.css?v=20260808c">
   <style>
     .session-title-input {
       background: transparent;
@@ -375,9 +376,9 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/ui.js"></script>
+  <script src="js/money.js?v=20260808c"></script>
+  <script src="js/store.js?v=20260808c"></script>
+  <script src="js/ui.js?v=20260808c"></script>
 
   <script>
     // App State
@@ -394,8 +395,13 @@
 
     const COLORS = ["#c9a227", "#3498db", "#e67e22", "#2ecc71", "#9b59b6", "#e74c3c", "#1abc9c"];
 
-    // Initialize Page
-    document.addEventListener('DOMContentLoaded', function () {
+    // Initialize Page (safe if DOMContentLoaded already fired)
+    function initPage() {
+      if (!window.AomUI || !window.AomStore || !window.AomMoney) {
+        alert('โหลดสคริปต์ไม่ครบ — รีเฟรชหน้าใหม่');
+        return;
+      }
+
       const sessionId = AomUI.getQuery('id');
       if (!sessionId) {
         AomUI.go('index.html');
@@ -469,7 +475,13 @@
       if (initialTab === 'summary' || initialTab === 'members' || initialTab === 'expenses') {
         switchTab(initialTab);
       }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initPage);
+    } else {
+      initPage();
+    }
 
     // Tab Switching — all in-page (no navigation)
     function switchTab(tab) {
