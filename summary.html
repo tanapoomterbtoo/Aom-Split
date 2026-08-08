@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Aom Split — สรุปยอดโอน</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <a href="index.html" class="brand">
+      <div class="logo">A</div>
+      <div>
+        <h1>Aom Split</h1>
+        <p class="sub" id="header-sub">สรุปยอดโอน</p>
+      </div>
+    </a>
+    <div class="spacer"></div>
+    <button type="button" class="btn btn-sm btn-ghost" id="btn-share-top" title="แชร์สรุป">
+      📤 แชร์
+    </button>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+    <!-- Sticky Tabs Navigation -->
+    <nav class="tabs">
+      <a href="session.html" id="tab-items">รายการ</a>
+      <a href="summary.html" class="active" id="tab-summary">สรุปโอน ⚡</a>
+    </nav>
+
+    <!-- Trip Header Card -->
+    <div class="card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+      <div>
+        <h2 id="session-title" style="margin: 0; font-size: 1.15rem; font-weight: 700;">-</h2>
+        <div id="session-meta" class="muted" style="font-size: 0.82rem; margin-top: 0.2rem;">-</div>
+      </div>
+      <div id="plan-status-badge"></div>
+    </div>
+
+    <!-- Section 1: ยอดต่อคน (กิน / จ่าย / สุทธิ) -->
+    <div class="card">
+      <div class="card-h">
+        <h3>👥 ยอดต่อคน</h3>
+      </div>
+      <p class="muted" style="font-size: 0.82rem; margin: -0.2rem 0 0.85rem;">
+        💡 ยอดสุทธิ = จ่ายจริง − ส่วนที่กิน (บวก = เจ้าหนี้/รอรับเงิน, ลบ = ลูกหนี้/ต้องโอน)
+      </p>
+      <div id="members-list"></div>
+    </div>
+
+    <!-- Section 2: รายการต้องโอน (Transfers Cards) -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 1.25rem 0.2rem 0.65rem;">
+      <h3 style="margin: 0; font-size: 1rem; font-weight: 700;">💸 รายการต้องโอน (Minimize Transfers)</h3>
+      <button type="button" class="btn btn-sm btn-ghost" id="btn-copy-transfers-inline" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+        📋 คัดลอกเฉพาะรายการโอน
+      </button>
+    </div>
+    <div id="transfers-list"></div>
+
+    <!-- Section 3: แชร์สรุป -->
+    <div class="card" style="margin-top: 1.25rem; margin-bottom: 2rem;">
+      <div class="card-h">
+        <h3>📤 ส่งให้เพื่อน / แชร์สรุป</h3>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary btn-block" id="btn-share-all">
+          📋 คัดลอกสรุปทั้งหมด (ส่งเข้า LINE/Chat)
+        </button>
+        <button type="button" class="btn btn-block" id="btn-copy-transfers">
+          💸 คัดลอกเฉพาะรายการโอน
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Mobile Bottom Action Bar -->
+  <div class="bottom-bar">
+    <div class="inner">
+      <button type="button" class="btn btn-primary btn-block" id="btn-share-bottom">
+        📋 แชร์สรุปทั้งก้อน
+      </button>
+      <button type="button" class="btn btn-block" id="btn-copy-transfers-bottom">
+        💸 คัดลอกเฉพาะรายการโอน
+      </button>
+    </div>
+  </div>
+
+  <!-- Shared Scripts -->
+  <script src="js/money.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/ui.js"></script>
+
+  <script>
+    (function () {
+      // 1. Get Session ID from query param
+      const id = AomUI.getQuery("id");
+      if (!id) {
+        location.href = "index.html";
+        return;
+      }
+
+      // 2. Load Session from store
+      let session = AomStore.getSession(id);
+      if (!session) {
+        location.href = "index.html";
+        return;
+      }
+
+      // 3. Configure Navigation Tabs with Session ID
+      const tabItems = document.getElementById("tab-items");
+      if (tabItems) tabItems.href = "session.html?id=" + encodeURIComponent(id);
+
+      const tabSummary = document.getElementById("tab-summary");
+      if (tabSummary) tabSummary.href = "summary.html?id=" + encodeURIComponent(id);
+
+      // 4. Render Summary Page
+      function render() {
+        // Refresh session data from store in case of updates
+        session = AomStore.getSession(id) || session;
+        const plan = AomMoney.recompute(session);
+
+        // Header & Session Info
+        document.getElementById("header-sub").textContent = session.title || "สรุปยอดโอน";
+        document.getElementById("session-title").textContent = "🍺 " + (session.title || "ทริปกินเหล้า");
+        document.getElementById("session-meta").textContent =
+          "📅 วันที่ " + (session.date || "") + " · 👥 สมาชิก " + (session.members || []).length + " คน · 🧾 " + (session.expenses || []).filter(function(e){ return !e.deleted; }).length + " รายการ";
+
+        // Balance invariant check badge
+        const badgeEl = document.getElementById("plan-status-badge");
+        if (plan.ok) {
+          badgeEl.innerHTML = '<span class="badge ok">✓ ยอดสมดุล</span>';
+        } else {
+          badgeEl.innerHTML = '<span class="badge warn">⚠️ ยอดไม่สมดุล (' + AomMoney.formatSigned(plan.sumCheck) + ')</span>';
+        }
+
+        // --- Render Per-Member Cards (กิน / จ่าย / สุทธิ) ---
+        const membersContainer = document.getElementById("members-list");
+        membersContainer.innerHTML = "";
+
+        (session.members || []).forEach(function (m) {
+          const owed = plan.owed[m.id] || 0;
+          const paid = plan.paid[m.id] || 0;
+          const bal = plan.balances[m.id] || 0;
+
+          let balClass = "money";
+          let statusBadge = '<span class="badge">ลงตัวพอดี</span>';
+          if (bal > 0) {
+            balClass = "money pos";
+            statusBadge = '<span class="badge ok">เจ้าหนี้ (รอรับ)</span>';
+          } else if (bal < 0) {
+            balClass = "money neg";
+            statusBadge = '<span class="badge warn">ลูกหนี้ (ต้องโอน)</span>';
+          }
+
+          const card = document.createElement("div");
+          card.className = "card";
+          card.style.marginBottom = "0.75rem";
+          card.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.55rem;">
+              <div style="display:flex;align-items:center;gap:0.6rem;">
+                ${AomUI.avatar(session, m.id, 36)}
+                <span style="font-weight:700;font-size:1.05rem;">${escapeHtml(m.displayName)}</span>
+              </div>
+              ${statusBadge}
+            </div>
+            <div class="stat-row">
+              <div class="s">
+                <div class="l">กิน (ส่วนที่กิน)</div>
+                <div class="v money">${AomMoney.formatMoney(owed)}</div>
+              </div>
+              <div class="s">
+                <div class="l">จ่าย (จ่ายจริง)</div>
+                <div class="v money">${AomMoney.formatMoney(paid)}</div>
+              </div>
+              <div class="s">
+                <div class="l">สุทธิ</div>
+                <div class="v ${balClass}">${AomMoney.formatSigned(bal)}</div>
+              </div>
+            </div>
+          `;
+          membersContainer.appendChild(card);
+        });
+
+        // --- Render Transfers Cards ---
+        const transfersContainer = document.getElementById("transfers-list");
+        transfersContainer.innerHTML = "";
+
+        if (!plan.transfers || plan.transfers.length === 0) {
+          transfersContainer.innerHTML = `
+            <div class="card empty">
+              <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">🎉</div>
+              <div style="font-weight: 700; font-size: 1.1rem; color: var(--good); margin-bottom: 0.25rem;">ลงตัวแล้ว!</div>
+              <div class="muted" style="font-size:0.88rem;">ทุกคนจ่ายตรงตามส่วนที่กินพอดี ไม่ต้องโอนเงินเพิ่ม</div>
+            </div>
+          `;
+        } else {
+          plan.transfers.forEach(function (t) {
+            const fromName = AomUI.memberName(session, t.from);
+            const toName = AomUI.memberName(session, t.to);
+            const amtStr = AomMoney.formatMoney(t.amountMinor);
+            const tKey = AomStore.transferKey(t);
+            const isDone = !!(session.transferMarks && session.transferMarks[tKey] && session.transferMarks[tKey].done);
+            const singleText = fromName + " โอนให้ " + toName + " " + amtStr;
+
+            const tCard = document.createElement("div");
+            tCard.className = "card transfer-card" + (isDone ? " done" : "");
+            tCard.innerHTML = `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:1.05rem;flex-wrap:wrap;">
+                  ${AomUI.avatar(session, t.from, 32)}
+                  <span>${escapeHtml(fromName)}</span>
+                  <span class="arrow" style="color:var(--muted)">→</span>
+                  ${AomUI.avatar(session, t.to, 32)}
+                  <span>${escapeHtml(toName)}</span>
+                </div>
+                ${isDone ? '<span class="badge ok">✓ โอนแล้ว</span>' : ''}
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;">
+                <div class="money big">${amtStr}</div>
+                <div class="btn-row">
+                  <button type="button" class="btn btn-sm btn-copy-single" data-text="${escapeAttr(singleText)}">📋 คัดลอก</button>
+                  <button type="button" class="btn btn-sm ${isDone ? 'btn-ghost' : 'btn-primary'} btn-toggle-mark" data-key="${escapeAttr(tKey)}" data-done="${isDone ? 'false' : 'true'}">
+                    ${isDone ? 'ยกเลิกโอนแล้ว' : '✓ โอนแล้ว'}
+                  </button>
+                </div>
+              </div>
+            `;
+            transfersContainer.appendChild(tCard);
+          });
+        }
+
+        // Attach Event Handlers for Copy Single & Toggle Mark Done
+        const copyBtns = transfersContainer.querySelectorAll(".btn-copy-single");
+        copyBtns.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const text = btn.getAttribute("data-text");
+            if (text) AomUI.copyText(text);
+          });
+        });
+
+        const markBtns = transfersContainer.querySelectorAll(".btn-toggle-mark");
+        markBtns.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const key = btn.getAttribute("data-key");
+            const targetDone = btn.getAttribute("data-done") === "true";
+            AomStore.markTransfer(session.id, key, targetDone);
+            render();
+          });
+        });
+      }
+
+      // 5. Share Functions
+      function shareAll() {
+        const plan = AomMoney.recompute(session);
+        const shareText = AomUI.buildShareText(session, plan);
+        AomUI.copyText(shareText);
+      }
+
+      function copyTransfersOnly() {
+        const plan = AomMoney.recompute(session);
+        if (!plan.transfers || !plan.transfers.length) {
+          AomUI.copyText("✅ ลงตัวแล้ว ไม่ต้องโอนเพิ่ม");
+          return;
+        }
+        const lines = plan.transfers.map(function (t) {
+          return (
+            AomUI.memberName(session, t.from) +
+            " → " +
+            AomUI.memberName(session, t.to) +
+            " " +
+            AomMoney.formatMoney(t.amountMinor)
+          );
+        });
+        AomUI.copyText("— รายการโอน —\n" + lines.join("\n"));
+      }
+
+      // Bind buttons
+      ["btn-share-all", "btn-share-top", "btn-share-bottom"].forEach(function (btnId) {
+        const el = document.getElementById(btnId);
+        if (el) el.addEventListener("click", shareAll);
+      });
+
+      ["btn-copy-transfers", "btn-copy-transfers-inline", "btn-copy-transfers-bottom"].forEach(function (btnId) {
+        const el = document.getElementById(btnId);
+        if (el) el.addEventListener("click", copyTransfersOnly);
+      });
+
+      // Helper functions for escaping HTML & Attributes
+      function escapeHtml(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function escapeAttr(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      // Initial render
+      render();
+    })();
+  </script>
+</body>
+</html>

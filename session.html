@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Aom Split — จัดการทริป</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .session-title-input {
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--text);
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 0.3rem 0.5rem;
+      border-radius: 8px;
+      width: 100%;
+      font-family: inherit;
+    }
+    .session-title-input:hover {
+      border-color: var(--accent);
+    }
+    .session-title-input:focus {
+      border-style: solid;
+      border-color: var(--accent);
+      background: var(--bg);
+      outline: none;
+    }
+    .fab {
+      position: fixed;
+      right: 1.25rem;
+      bottom: calc(1.5rem + var(--safe-b));
+      background: linear-gradient(135deg, var(--accent), #d4920f);
+      color: #1a1205;
+      border: none;
+      border-radius: 999px;
+      padding: 0.85rem 1.4rem;
+      font-weight: 700;
+      font-size: 1rem;
+      box-shadow: 0 8px 24px rgba(240, 180, 41, 0.4);
+      cursor: pointer;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .fab:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 12px 28px rgba(240, 180, 41, 0.5);
+    }
+    .fab:active {
+      transform: translateY(0) scale(0.98);
+    }
+    .member-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .member-item-row:last-child {
+      border-bottom: none;
+    }
+    .member-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .member-name {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    .member-stats {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .participant-row-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.45rem 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .participant-row-item:last-child {
+      border-bottom: none;
+    }
+    .exact-input {
+      width: 110px;
+      text-align: right;
+    }
+    .summary-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .summary-stat-val {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .summary-stat-lbl {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .color-picker-dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: inline-block;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s ease;
+    }
+    .color-picker-dot:hover {
+      transform: scale(1.1);
+    }
+    .color-picker-dot.active {
+      border-color: #fff;
+      transform: scale(1.15);
+    }
+    .color-select-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-top: 0.4rem;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .exact-validation-msg {
+      font-size: 0.82rem;
+      margin-top: 0.4rem;
+      font-weight: 600;
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+    }
+    .exact-validation-msg.ok {
+      background: rgba(61, 214, 140, 0.12);
+      color: var(--good);
+      border: 1px solid rgba(61, 214, 140, 0.3);
+    }
+    .exact-validation-msg.error {
+      background: rgba(255, 107, 107, 0.12);
+      color: var(--bad);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+    .btn-icon {
+      padding: 0.35rem 0.6rem;
+      border-radius: 8px;
+    }
+    .badge-mode {
+      font-size: 0.72rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 6px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .exp-item-actions {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .split-mode-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <a href="index.html" class="btn btn-ghost btn-sm" title="กลับหน้าแรก" style="padding:0.4rem 0.6rem;">
+      ‹ หน้าแรก
+    </a>
+    <div class="spacer"></div>
+    <div class="sub" id="session-date-badge"></div>
+  </header>
+
+  <main class="container">
+    <!-- Session Title Banner -->
+    <div class="card" style="margin-bottom: 0.85rem;">
+      <label for="session-title-input" style="font-size: 0.75rem;">ชื่อทริป / โต๊ะคืนนี้ (กดเพื่อแก้ไข)</label>
+      <input type="text" id="session-title-input" class="session-title-input" placeholder="ระบุชื่อทริป..." />
+    </div>
+
+    <!-- Sticky Tabs Navigation -->
+    <nav class="tabs">
+      <button type="button" id="tab-btn-expenses" class="active" onclick="switchTab('expenses')">
+        รายการ (<span id="tab-count-expenses">0</span>)
+      </button>
+      <button type="button" id="tab-btn-members" onclick="switchTab('members')">
+        สมาชิก (<span id="tab-count-members">0</span>)
+      </button>
+      <a id="tab-link-summary" href="summary.html" class="tabs-link" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;">
+        สรุปโอน ⚡
+      </a>
+    </nav>
+
+    <!-- Tab 1: รายการ (Expenses) -->
+    <section id="section-expenses" class="tab-content active">
+      <div class="summary-bar">
+        <div>
+          <div class="summary-stat-lbl">ยอดรวมทั้งคืน</div>
+          <div class="summary-stat-val" id="total-expenses-amount">฿0.00</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="summary-stat-lbl">จำนวนรายการ</div>
+          <div style="font-weight: 700; font-size: 1.1rem;" id="total-expenses-count">0 รายการ</div>
+        </div>
+      </div>
+
+      <div id="expenses-list">
+        <!-- Rendered expenses -->
+      </div>
+    </section>
+
+    <!-- Tab 2: สมาชิก (Members) -->
+    <section id="section-members" class="tab-content">
+      <!-- Add Member Form Card -->
+      <div class="card">
+        <div class="card-h">
+          <h2>➕ เพิ่มสมาชิกใหม่</h2>
+        </div>
+        <form id="add-member-form" onsubmit="handleAddMember(event)">
+          <div class="field">
+            <label for="new-member-name">ชื่อสมาชิก</label>
+            <input type="text" id="new-member-name" class="input" placeholder="เช่น อาร์ม, บีม, ชา" required autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>สีประจำตัว</label>
+            <div class="color-select-row" id="color-picker-options">
+              <!-- Color dots populated dynamically -->
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">+ เพิ่มสมาชิก</button>
+        </form>
+      </div>
+
+      <!-- Members List Card -->
+      <div class="card">
+        <div class="card-h">
+          <h2>👥 รายชื่อสมาชิกในทริป</h2>
+        </div>
+        <div id="members-list">
+          <!-- Rendered members -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Floating Action Button for Adding Expense -->
+  <button type="button" id="fab-add-expense" class="fab" onclick="openExpenseModal()">
+    <span style="font-size: 1.25rem; line-height: 1;">+</span> เพิ่มรายการ
+  </button>
+
+  <!-- Expense Modal / Sheet -->
+  <div id="expense-modal" class="modal-backdrop" onclick="handleModalBackdropClick(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="card-h" style="margin-bottom: 1rem;">
+        <h3 id="modal-title">เพิ่มรายการจ่าย</h3>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeExpenseModal()">✕</button>
+      </div>
+
+      <form id="expense-form" onsubmit="handleSaveExpense(event)">
+        <!-- Title -->
+        <div class="field">
+          <label for="exp-title">ชื่อรายการ *</label>
+          <input type="text" id="exp-title" class="input" placeholder="เช่น เบียร์ถัง, วิสกี้ช็อต, ไก่ทอด" required autocomplete="off" />
+        </div>
+
+        <!-- Amount & PaidBy in row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="field">
+            <label for="exp-amount">จำนวนเงิน (บาท) *</label>
+            <input type="number" id="exp-amount" class="input money" placeholder="0.00" step="0.01" min="0.01" required oninput="handleAmountOrModeChange()" />
+          </div>
+          <div class="field">
+            <label for="exp-paid-by">คนจ่าย (Paid By) *</label>
+            <select id="exp-paid-by" class="input" required onchange="handlePaidByChange()">
+              <!-- Options populated dynamically -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Split Mode Segment -->
+        <div class="field">
+          <label>รูปแบบการหาร (Split Mode)</label>
+          <div class="seg" id="split-mode-seg">
+            <button type="button" data-mode="equal" class="on" onclick="setSplitMode('equal')">หารเท่า</button>
+            <button type="button" data-mode="shares" onclick="setSplitMode('shares')">สัดส่วน</button>
+            <button type="button" data-mode="exact" onclick="setSplitMode('exact')">ระบุบาท</button>
+            <button type="button" data-mode="treat" onclick="setSplitMode('treat')">เลี้ยง 🎁</button>
+          </div>
+          <div id="split-mode-help" class="split-mode-desc">
+            หารเท่ากันทุกคนที่ร่วมรายการ
+          </div>
+        </div>
+
+        <!-- Participant Chips (Toggle who joins) -->
+        <div class="field" id="participants-field-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+            <label style="margin:0;">ผู้ร่วมหาร (แตะเพื่อเปิด/ปิด)</label>
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.75rem; padding:0.1rem 0.4rem;" onclick="selectAllParticipants()">เลือกทุกคน</button>
+          </div>
+          <div class="chip-row" id="participant-chips-container">
+            <!-- Chips rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Mode Specific Dynamic Container -->
+        <div class="field" id="mode-details-container">
+          <!-- Dynamic contents for shares / exact / treat -->
+        </div>
+
+        <!-- Submit & Delete Buttons -->
+        <div class="btn-row" style="margin-top: 1.25rem;">
+          <button type="submit" class="btn btn-primary" style="flex: 2;">บันทึกรายการ</button>
+          <button type="button" id="btn-modal-delete" class="btn btn-danger" style="flex: 1; display: none;" onclick="handleDeleteExpenseFromModal()">ลบรายการ</button>
+          <button type="button" class="btn" style="flex: 1;" onclick="closeExpenseModal()">ยกเลิก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Shared Scripts -->
+  <script src="js/money.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/ui.js"></script>
+
+  <script>
+    // App State
+    let currentSession = null;
+    let activeTab = 'expenses';
+    let selectedColor = '#c9a227';
+
+    // Expense Form State
+    let editingExpenseId = null;
+    let currentSplitMode = 'equal';
+    let selectedParticipantIds = new Set();
+    let sharesMap = {}; // { memberId: number }
+    let exactBahtMap = {}; // { memberId: number }
+
+    const COLORS = ["#c9a227", "#3498db", "#e67e22", "#2ecc71", "#9b59b6", "#e74c3c", "#1abc9c"];
+
+    // Initialize Page
+    document.addEventListener('DOMContentLoaded', function () {
+      const sessionId = AomUI.getQuery('id');
+      if (!sessionId) {
+        location.href = 'index.html';
+        return;
+      }
+
+      currentSession = AomStore.getSession(sessionId);
+      if (!currentSession) {
+        location.href = 'index.html';
+        return;
+      }
+
+      // Update link to summary
+      const summaryLink = document.getElementById('tab-link-summary');
+      if (summaryLink) {
+        summaryLink.href = 'summary.html?id=' + encodeURIComponent(currentSession.id);
+      }
+
+      // Setup Session Title Listener
+      const titleInput = document.getElementById('session-title-input');
+      titleInput.value = currentSession.title || 'ทริปกินเหล้า';
+      titleInput.addEventListener('change', function () {
+        const val = this.value.trim();
+        currentSession.title = val || 'ทริปกินเหล้า';
+        AomStore.upsertSession(currentSession);
+        AomUI.toast('บันทึกชื่อทริปแล้ว');
+      });
+
+      // Date badge
+      const dateBadge = document.getElementById('session-date-badge');
+      if (dateBadge) {
+        dateBadge.textContent = currentSession.date || '';
+      }
+
+      // Setup Color Picker for Member Form
+      renderColorPicker();
+
+      // Initial Render
+      render();
+    });
+
+    // Tab Switching
+    function switchTab(tab) {
+      activeTab = tab;
+      const btnExpenses = document.getElementById('tab-btn-expenses');
+      const btnMembers = document.getElementById('tab-btn-members');
+      const secExpenses = document.getElementById('section-expenses');
+      const secMembers = document.getElementById('section-members');
+      const fab = document.getElementById('fab-add-expense');
+
+      if (tab === 'expenses') {
+        btnExpenses.classList.add('active');
+        btnMembers.classList.remove('active');
+        secExpenses.classList.add('active');
+        secMembers.classList.remove('active');
+        fab.style.display = 'flex';
+      } else {
+        btnMembers.classList.add('active');
+        btnExpenses.classList.remove('active');
+        secMembers.classList.add('active');
+        secExpenses.classList.remove('active');
+        fab.style.display = 'none';
+      }
+    }
+
+    // Color Picker Setup
+    function renderColorPicker() {
+      const container = document.getElementById('color-picker-options');
+      if (!container) return;
+      container.innerHTML = COLORS.map(function (c) {
+        const activeClass = c === selectedColor ? 'active' : '';
+        return '<span class="color-picker-dot ' + activeClass + '" style="background:' + c + ';" onclick="selectColor(\'' + c + '\')"></span>';
+      }).join('');
+    }
+
+    function selectColor(color) {
+      selectedColor = color;
+      renderColorPicker();
+    }
+
+    // Main Render Function
+    function render() {
+      if (!currentSession) return;
+
+      const members = currentSession.members || [];
+      const expenses = (currentSession.expenses || []).filter(function (e) { return !e.deleted; });
+
+      // Update Tab Counts
+      document.getElementById('tab-count-expenses').textContent = expenses.length;
+      document.getElementById('tab-count-members').textContent = members.length;
+
+      // Render Expenses Section
+      renderExpensesList(expenses);
+
+      // Render Members Section
+      renderMembersList(members, expenses);
+    }
+
+    // Render Expenses List
+    function renderExpensesList(expenses) {
+      const container = document.getElementById('expenses-list');
+      const totalAmountEl = document.getElementById('total-expenses-amount');
+      const totalCountEl = document.getElementById('total-expenses-count');
+
+      let sumSatang = 0;
+      expenses.forEach(function (e) {
+        sumSatang += (e.amountMinor || 0);
+      });
+
+      totalAmountEl.textContent = AomMoney.formatMoney(sumSatang);
+      totalCountEl.textContent = expenses.length + ' รายการ';
+
+      if (!expenses.length) {
+        container.innerHTML = `
+          <div class="card empty">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🍺</div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text);">ยังไม่มีรายการจ่าย</div>
+            <div style="margin-top: 0.38rem;">กดปุ่ม <strong>"+ เพิ่มรายการ"</strong> ด้านล่างเพื่อเพิ่มรายการแรก</div>
+          </div>
+        `;
+        return;
+      }
+
+      const modeLabels = {
+        equal: 'หารเท่า',
+        shares: 'สัดส่วน',
+        exact: 'ระบุบาท',
+        treat: 'เลี้ยง 🎁'
+      };
+
+      container.innerHTML = expenses.map(function (e) {
+        const paidByName = AomUI.memberName(currentSession, e.paidByMemberId);
+        const modeText = modeLabels[e.splitMode] || e.splitMode || 'หารเท่า';
+        const parts = e.participants || [];
+        const partAvatars = parts.map(function (pid) {
+          return AomUI.avatar(currentSession, pid, 24);
+        }).join(' ');
+
+        return `
+          <div class="card">
+            <div class="card-h" style="margin-bottom: 0.4rem;">
+              <div>
+                <span class="list-item-title" style="font-weight: 700; font-size: 1.05rem;">${escapeHtml(e.title)}</span>
+                <span class="badge-mode" style="margin-left: 0.4rem;">${modeText}</span>
+              </div>
+              <div class="money big">${AomMoney.formatMoney(e.amountMinor)}</div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem;">
+              <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <span>คนจ่าย:</span>
+                ${AomUI.avatar(currentSession, e.paidByMemberId, 22)}
+                <strong style="color: var(--text);">${escapeHtml(paidByName)}</strong>
+              </div>
+              <div class="exp-item-actions">
+                <button type="button" class="btn btn-ghost btn-sm btn-icon" onclick="openExpenseModal('${e.id}')" title="แก้ไข">✏️ แก้ไข</button>
+                <button type="button" class="btn btn-ghost btn-sm btn-icon" style="color: var(--bad);" onclick="deleteExpenseDirect('${e.id}')" title="ลบ">🗑️</button>
+              </div>
+            </div>
+            <div style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); display: flex; align-items: center; gap: 0.4rem;">
+              <span style="font-size: 0.78rem; color: var(--muted);">ผู้ร่วมหาร (${parts.length} คน):</span>
+              <div style="display: flex; gap: 0.2rem; flex-wrap: wrap;">
+                ${partAvatars || '<span style="font-size:0.78rem; color:var(--muted);">-</span>'}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Direct Delete Expense
+    function deleteExpenseDirect(expenseId) {
+      const exp = (currentSession.expenses || []).find(function (e) { return e.id === expenseId; });
+      if (!exp) return;
+      if (confirm('คุณต้องการลบรายการ "' + exp.title + '" ใช่หรือไม่?')) {
+        currentSession.expenses = currentSession.expenses.filter(function (e) { return e.id !== expenseId; });
+        AomStore.upsertSession(currentSession);
+        render();
+        AomUI.toast('ลบรายการเรียบร้อย');
+      }
+    }
+
+    // Render Members List
+    function renderMembersList(members, expenses) {
+      const container = document.getElementById('members-list');
+      if (!members.length) {
+        container.innerHTML = `
+          <div class="empty">ยังไม่มีสมาชิกในทริป กรุณาเพิ่มสมาชิกอย่างน้อย 1 คน</div>
+        `;
+        return;
+      }
+
+      container.innerHTML = members.map(function (m) {
+        const paidCount = expenses.filter(function (e) { return e.paidByMemberId === m.id; }).length;
+        const partCount = expenses.filter(function (e) { return (e.participants || []).includes(m.id); }).length;
+
+        return `
+          <div class="member-item-row">
+            <div class="member-info">
+              ${AomUI.avatar(currentSession, m.id, 38)}
+              <div>
+                <div class="member-name">${escapeHtml(m.displayName)}</div>
+                <div class="member-stats">จ่ายไป ${paidCount} รายการ · มีส่วนร่วม ${partCount} รายการ</div>
+              </div>
+            </div>
+            <div>
+              <button type="button" class="btn btn-ghost btn-sm" style="color: var(--bad);" onclick="handleRemoveMember('${m.id}')">ลบ</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Add Member Handler
+    function handleAddMember(e) {
+      e.preventDefault();
+      const input = document.getElementById('new-member-name');
+      const name = input.value.trim();
+      if (!name) return;
+
+      currentSession.members = currentSession.members || [];
+      const newMember = {
+        id: AomStore.uid('m'),
+        displayName: name,
+        color: selectedColor
+      };
+      currentSession.members.push(newMember);
+
+      // Rotate color selection for next add
+      const nextIndex = (COLORS.indexOf(selectedColor) + 1) % COLORS.length;
+      selectedColor = COLORS[nextIndex];
+      renderColorPicker();
+
+      AomStore.upsertSession(currentSession);
+      input.value = '';
+      render();
+      AomUI.toast('เพิ่มสมาชิก "' + name + '" เรียบร้อย');
+    }
+
+    // Remove Member Handler
+    function handleRemoveMember(memberId) {
+      const m = (currentSession.members || []).find(function (x) { return x.id === memberId; });
+      if (!m) return;
+
+      const activeExpenses = (currentSession.expenses || []).filter(function (e) { return !e.deleted; });
+      const isPaid = activeExpenses.some(function (e) { return e.paidByMemberId === memberId; });
+      const isPart = activeExpenses.some(function (e) { return (e.participants || []).includes(memberId); });
+
+      if (isPaid || isPart) {
+        alert('ไม่สามารถลบ "' + m.displayName + '" ได้ เนื่องจากสมาชิกนี้มีส่วนร่วมในรายการจ่ายแล้ว (กรุณาลบหรือแก้ไขรายการที่เกี่ยวข้องก่อน)');
+        return;
+      }
+
+      if (confirm('ยืนยันลบสมาชิก "' + m.displayName + '" ?')) {
+        currentSession.members = currentSession.members.filter(function (x) { return x.id !== memberId; });
+        AomStore.upsertSession(currentSession);
+        render();
+        AomUI.toast('ลบสมาชิกเรียบร้อย');
+      }
+    }
+
+    // --- EXPENSE MODAL LOGIC ---
+
+    function openExpenseModal(expenseId) {
+      const members = currentSession.members || [];
+      if (!members.length) {
+        alert('กรุณาเพิ่มสมาชิกในแท็บสมาชิกก่อนเพิ่มรายการจ่าย');
+        switchTab('members');
+        return;
+      }
+
+      editingExpenseId = expenseId || null;
+      const modalTitle = document.getElementById('modal-title');
+      const btnDelete = document.getElementById('btn-modal-delete');
+      const paidBySelect = document.getElementById('exp-paid-by');
+
+      // Populate PaidBy options
+      paidBySelect.innerHTML = members.map(function (m) {
+        return '<option value="' + m.id + '">' + escapeHtml(m.displayName) + '</option>';
+      }).join('');
+
+      // Reset / Populate Form
+      if (editingExpenseId) {
+        modalTitle.textContent = 'แก้ไขรายการจ่าย';
+        btnDelete.style.display = 'block';
+        const exp = (currentSession.expenses || []).find(function (e) { return e.id === expenseId; });
+        if (exp) {
+          document.getElementById('exp-title').value = exp.title || '';
+          document.getElementById('exp-amount').value = AomMoney.minorToBahtNumber(exp.amountMinor || 0);
+          paidBySelect.value = exp.paidByMemberId || members[0].id;
+          currentSplitMode = exp.splitMode || 'equal';
+
+          selectedParticipantIds = new Set(exp.participants || members.map(function (m) { return m.id; }));
+
+          sharesMap = {};
+          members.forEach(function (m) {
+            sharesMap[m.id] = (exp.shares && exp.shares[m.id]) ? exp.shares[m.id] : 1;
+          });
+
+          exactBahtMap = {};
+          members.forEach(function (m) {
+            exactBahtMap[m.id] = (exp.exactMinor && exp.exactMinor[m.id]) ? AomMoney.minorToBahtNumber(exp.exactMinor[m.id]) : 0;
+          });
+        }
+      } else {
+        modalTitle.textContent = 'เพิ่มรายการจ่าย';
+        btnDelete.style.display = 'none';
+        document.getElementById('exp-title').value = '';
+        document.getElementById('exp-amount').value = '';
+        paidBySelect.value = members[0].id;
+        currentSplitMode = 'equal';
+
+        // Default all participants selected
+        selectedParticipantIds = new Set(members.map(function (m) { return m.id; }));
+
+        sharesMap = {};
+        members.forEach(function (m) { sharesMap[m.id] = 1; });
+
+        exactBahtMap = {};
+        members.forEach(function (m) { exactBahtMap[m.id] = 0; });
+      }
+
+      updateSplitModeSegUI();
+      renderParticipantChips();
+      renderModeDetails();
+
+      const modal = document.getElementById('expense-modal');
+      modal.classList.add('show');
+    }
+
+    function closeExpenseModal() {
+      const modal = document.getElementById('expense-modal');
+      modal.classList.remove('show');
+    }
+
+    function handleModalBackdropClick(e) {
+      if (e.target === document.getElementById('expense-modal')) {
+        closeExpenseModal();
+      }
+    }
+
+    function setSplitMode(mode) {
+      currentSplitMode = mode;
+      updateSplitModeSegUI();
+
+      if (mode === 'treat') {
+        const paidBy = document.getElementById('exp-paid-by').value;
+        selectedParticipantIds = new Set([paidBy]);
+      } else if (selectedParticipantIds.size === 0) {
+        const members = currentSession.members || [];
+        selectedParticipantIds = new Set(members.map(function (m) { return m.id; }));
+      }
+
+      renderParticipantChips();
+      renderModeDetails();
+    }
+
+    function updateSplitModeSegUI() {
+      const segBtns = document.querySelectorAll('#split-mode-seg button');
+      segBtns.forEach(function (btn) {
+        if (btn.dataset.mode === currentSplitMode) {
+          btn.classList.add('on');
+        } else {
+          btn.classList.remove('on');
+        }
+      });
+
+      const helpEl = document.getElementById('split-mode-help');
+      const partsGroup = document.getElementById('participants-field-group');
+
+      if (currentSplitMode === 'equal') {
+        helpEl.textContent = 'หารเท่ากันทุกคนที่เลือกเป็นผู้ร่วมหาร';
+        partsGroup.style.display = 'block';
+      } else if (currentSplitMode === 'shares') {
+        helpEl.textContent = 'หารตามสัดส่วน/จำนวนส่วน (เช่น 2 ช็อต, 3 ช็อต)';
+        partsGroup.style.display = 'block';
+      } else if (currentSplitMode === 'exact') {
+        helpEl.textContent = 'กำหนดจำนวนเงินบาทของแต่ละคนโดยตรง';
+        partsGroup.style.display = 'block';
+      } else if (currentSplitMode === 'treat') {
+        helpEl.textContent = 'คนจ่ายเลี้ยงทั้งบิล (คนจ่ายรับผิดชอบ 100%)';
+        partsGroup.style.display = 'none';
+      }
+    }
+
+    function handlePaidByChange() {
+      if (currentSplitMode === 'treat') {
+        const paidBy = document.getElementById('exp-paid-by').value;
+        selectedParticipantIds = new Set([paidBy]);
+        renderParticipantChips();
+        renderModeDetails();
+      }
+    }
+
+    function handleAmountOrModeChange() {
+      if (currentSplitMode === 'exact') {
+        renderModeDetails();
+      }
+    }
+
+    function renderParticipantChips() {
+      const container = document.getElementById('participant-chips-container');
+      const members = currentSession.members || [];
+
+      container.innerHTML = members.map(function (m) {
+        const isSelected = selectedParticipantIds.has(m.id);
+        const chipClass = isSelected ? 'chip on' : 'chip';
+        return `
+          <div class="${chipClass}" onclick="toggleParticipant('${m.id}')">
+            ${AomUI.avatar(currentSession, m.id, 20)}
+            <span>${escapeHtml(m.displayName)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleParticipant(memberId) {
+      if (currentSplitMode === 'treat') return;
+
+      if (selectedParticipantIds.has(memberId)) {
+        if (selectedParticipantIds.size <= 1) {
+          AomUI.toast('ต้องมีผู้ร่วมหารอย่างน้อย 1 คน');
+          return;
+        }
+        selectedParticipantIds.delete(memberId);
+      } else {
+        selectedParticipantIds.add(memberId);
+      }
+      renderParticipantChips();
+      renderModeDetails();
+    }
+
+    function selectAllParticipants() {
+      if (currentSplitMode === 'treat') return;
+      const members = currentSession.members || [];
+      selectedParticipantIds = new Set(members.map(function (m) { return m.id; }));
+      renderParticipantChips();
+      renderModeDetails();
+    }
+
+    function renderModeDetails() {
+      const container = document.getElementById('mode-details-container');
+      const members = currentSession.members || [];
+      const activeMembers = members.filter(function (m) { return selectedParticipantIds.has(m.id); });
+
+      if (currentSplitMode === 'equal') {
+        const amountBaht = Number(document.getElementById('exp-amount').value) || 0;
+        if (amountBaht > 0 && activeMembers.length > 0) {
+          const perPerson = (amountBaht / activeMembers.length).toFixed(2);
+          container.innerHTML = `
+            <div style="font-size: 0.85rem; color: var(--muted); background: var(--bg); padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid var(--border);">
+              💡 ตกคนละประมาณ <strong class="money" style="color: var(--accent);">฿${perPerson}</strong> (${activeMembers.length} คน)
+            </div>
+          `;
+        } else {
+          container.innerHTML = '';
+        }
+        return;
+      }
+
+      if (currentSplitMode === 'shares') {
+        container.innerHTML = `
+          <label>จำนวนส่วนต่อคน (Stepper)</label>
+          <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem 0.75rem;">
+            ${activeMembers.map(function (m) {
+              const val = sharesMap[m.id] || 1;
+              return `
+                <div class="participant-row-item">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    ${AomUI.avatar(currentSession, m.id, 24)}
+                    <span style="font-weight: 600; font-size: 0.9rem;">${escapeHtml(m.displayName)}</span>
+                  </div>
+                  <div class="share-stepper">
+                    <button type="button" onclick="adjustShare('${m.id}', -1)">−</button>
+                    <span>${val}</span>
+                    <button type="button" onclick="adjustShare('${m.id}', 1)">+</button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+        return;
+      }
+
+      if (currentSplitMode === 'exact') {
+        const totalAmountBaht = Number(document.getElementById('exp-amount').value) || 0;
+        let currentSumBaht = 0;
+        activeMembers.forEach(function (m) {
+          currentSumBaht += (Number(exactBahtMap[m.id]) || 0);
+        });
+
+        const diffBaht = Math.round((totalAmountBaht - currentSumBaht) * 100) / 100;
+        let validationMsgHtml = '';
+        if (totalAmountBaht > 0) {
+          if (Math.abs(diffBaht) < 0.001) {
+            validationMsgHtml = '<div class="exact-validation-msg ok">✓ ยอดรวมตรงกับยอดรายการพอดี (฿' + totalAmountBaht.toFixed(2) + ')</div>';
+          } else if (diffBaht > 0) {
+            validationMsgHtml = '<div class="exact-validation-msg error">⚠️ รวมได้ ฿' + currentSumBaht.toFixed(2) + ' (ขาดอีก ฿' + diffBaht.toFixed(2) + ')</div>';
+          } else {
+            validationMsgHtml = '<div class="exact-validation-msg error">⚠️ รวมได้ ฿' + currentSumBaht.toFixed(2) + ' (เกินอยู่ ฿' + Math.abs(diffBaht).toFixed(2) + ')</div>';
+          }
+        }
+
+        container.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem;">
+            <label style="margin: 0;">ระบุยอดบาทแต่ละคน</label>
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.4rem;" onclick="distributeExactEqually()">กระจายเท่ากัน</button>
+          </div>
+          <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem 0.75rem;">
+            ${activeMembers.map(function (m) {
+              const val = exactBahtMap[m.id] !== undefined ? exactBahtMap[m.id] : '';
+              return `
+                <div class="participant-row-item">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    ${AomUI.avatar(currentSession, m.id, 24)}
+                    <span style="font-weight: 600; font-size: 0.9rem;">${escapeHtml(m.displayName)}</span>
+                  </div>
+                  <input type="number" class="input exact-input" step="0.01" min="0" placeholder="0.00" value="${val}" oninput="handleExactInputChange('${m.id}', this.value)" />
+                </div>
+              `;
+            }).join('')}
+          </div>
+          ${validationMsgHtml}
+        `;
+        return;
+      }
+
+      if (currentSplitMode === 'treat') {
+        const paidById = document.getElementById('exp-paid-by').value;
+        const paidByName = AomUI.memberName(currentSession, paidById);
+        container.innerHTML = `
+          <div style="font-size: 0.85rem; color: var(--accent); background: rgba(240, 180, 41, 0.1); padding: 0.7rem 0.85rem; border-radius: 12px; border: 1px solid rgba(240, 180, 41, 0.3);">
+            🎁 <strong>${escapeHtml(paidByName)}</strong> เป็นเจ้าภาพเลี้ยงรายการนี้ (รับผิดชอบเต็ม 100% คนอื่นไม่ต้องหาร)
+          </div>
+        `;
+        return;
+      }
+    }
+
+    function adjustShare(memberId, delta) {
+      const current = sharesMap[memberId] || 1;
+      const next = Math.max(1, current + delta);
+      sharesMap[memberId] = next;
+      renderModeDetails();
+    }
+
+    function handleExactInputChange(memberId, value) {
+      exactBahtMap[memberId] = Number(value) || 0;
+      renderModeDetails();
+    }
+
+    function distributeExactEqually() {
+      const totalBaht = Number(document.getElementById('exp-amount').value) || 0;
+      if (totalBaht <= 0) {
+        AomUI.toast('กรุณาระบุจำนวนเงินก่อน');
+        return;
+      }
+
+      const activeMembers = (currentSession.members || []).filter(function (m) { return selectedParticipantIds.has(m.id); });
+      if (!activeMembers.length) return;
+
+      const totalMinor = AomMoney.bahtToMinor(totalBaht);
+      const weightMap = {};
+      activeMembers.forEach(function (m) { weightMap[m.id] = 1; });
+
+      try {
+        const splitsMinor = AomMoney.splitByWeights(totalMinor, weightMap);
+        activeMembers.forEach(function (m) {
+          exactBahtMap[m.id] = AomMoney.minorToBahtNumber(splitsMinor[m.id] || 0);
+        });
+        renderModeDetails();
+      } catch (err) {
+        AomUI.toast(err.message);
+      }
+    }
+
+    // Save Expense Handler
+    function handleSaveExpense(e) {
+      e.preventDefault();
+
+      const title = document.getElementById('exp-title').value.trim();
+      const amountBaht = Number(document.getElementById('exp-amount').value);
+      const paidByMemberId = document.getElementById('exp-paid-by').value;
+
+      if (!title) {
+        alert('กรุณาระบุชื่อรายการ');
+        return;
+      }
+      if (!amountBaht || amountBaht <= 0) {
+        alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
+        return;
+      }
+      if (!paidByMemberId) {
+        alert('กรุณาเลือกคนจ่าย');
+        return;
+      }
+
+      const amountMinor = AomMoney.bahtToMinor(amountBaht);
+      const participants = Array.from(selectedParticipantIds);
+
+      if (currentSplitMode !== 'treat' && !participants.length) {
+        alert('กรุณาเลือกผู้ร่วมหารอย่างน้อย 1 คน');
+        return;
+      }
+
+      const expenseData = {
+        id: editingExpenseId || AomStore.uid('e'),
+        title: title,
+        amountMinor: amountMinor,
+        paidByMemberId: paidByMemberId,
+        splitMode: currentSplitMode,
+        participants: currentSplitMode === 'treat' ? [paidByMemberId] : participants
+      };
+
+      if (currentSplitMode === 'shares') {
+        const modeShares = {};
+        participants.forEach(function (pid) {
+          modeShares[pid] = sharesMap[pid] || 1;
+        });
+        expenseData.shares = modeShares;
+      } else if (currentSplitMode === 'exact') {
+        const modeExactMinor = {};
+        let sumExactSatang = 0;
+        participants.forEach(function (pid) {
+          const minor = AomMoney.bahtToMinor(exactBahtMap[pid] || 0);
+          modeExactMinor[pid] = minor;
+          sumExactSatang += minor;
+        });
+        expenseData.exactMinor = modeExactMinor;
+
+        if (sumExactSatang !== amountMinor) {
+          alert('ยอดรวมการระบุบาท (' + AomMoney.formatMoney(sumExactSatang) + ') ไม่ตรงกับยอดรายการ (' + AomMoney.formatMoney(amountMinor) + ')');
+          return;
+        }
+      }
+
+      // Test resolveSplits logic before saving
+      try {
+        AomMoney.resolveSplits(expenseData);
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการคำนวณ: ' + err.message);
+        return;
+      }
+
+      // Save to Session
+      currentSession.expenses = currentSession.expenses || [];
+      if (editingExpenseId) {
+        const idx = currentSession.expenses.findIndex(function (x) { return x.id === editingExpenseId; });
+        if (idx >= 0) {
+          currentSession.expenses[idx] = expenseData;
+        } else {
+          currentSession.expenses.push(expenseData);
+        }
+      } else {
+        currentSession.expenses.push(expenseData);
+      }
+
+      AomStore.upsertSession(currentSession);
+      closeExpenseModal();
+      render();
+      AomUI.toast(editingExpenseId ? 'แก้ไขรายการเรียบร้อย' : 'เพิ่มรายการเรียบร้อย');
+    }
+
+    // Delete Expense from Modal
+    function handleDeleteExpenseFromModal() {
+      if (!editingExpenseId) return;
+      deleteExpenseDirect(editingExpenseId);
+      closeExpenseModal();
+    }
+
+    // HTML Escape Helper
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
