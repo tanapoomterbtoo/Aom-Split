@@ -5,6 +5,12 @@
 
 ไม่ใช่ระบบ POS ร้าน — เป็นตัวช่วยหารบิลในกลุ่มเพื่อน (แนว Splitwise เฉพาะทริปกินดื่ม)
 
+## 🌐 Live (GitHub Pages)
+
+**https://tanapoomterbtoo.github.io/Aom-Split/**
+
+Source: branch `main` · folder `/` (root)
+
 ---
 
 ## เปิดใช้งาน
@@ -95,10 +101,19 @@ npx --yes serve .
 
 ---
 
-## Deploy บน GitHub Pages (ทางเลือก)
+## Deploy บน GitHub Pages
 
-1. Settings → Pages → Source: Deploy from branch `main` / folder `/ (root)`
-2. รอสักครู่ แล้วเปิด `https://<user>.github.io/Aom-Split/`
+ตั้งค่าแล้ว:
+
+| รายการ | ค่า |
+|--------|-----|
+| Source | Deploy from branch **`main`** / **`/` (root)** |
+| URL | https://tanapoomterbtoo.github.io/Aom-Split/ |
+| HTTPS | เปิดอยู่ |
+
+หลัง `git push origin main` GitHub จะ rebuild หน้าเว็บให้อัตโนมัติ (อาจใช้เวลา 1–2 นาที)
+
+ถ้าจะตั้งใหม่เอง: **Settings → Pages → Build and deployment → Deploy from a branch → main / /**  
 
 ---
 
