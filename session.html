@@ -202,7 +202,7 @@
       <input type="text" id="session-title-input" class="session-title-input" placeholder="ระบุชื่อทริป..." />
     </div>
 
-    <!-- Sticky Tabs Navigation -->
+    <!-- Sticky Tabs Navigation (in-page — ไม่เปลี่ยนหน้า เพื่อไม่เด้ง) -->
     <nav class="tabs">
       <button type="button" id="tab-btn-expenses" class="active" onclick="switchTab('expenses')">
         รายการ (<span id="tab-count-expenses">0</span>)
@@ -210,9 +210,9 @@
       <button type="button" id="tab-btn-members" onclick="switchTab('members')">
         สมาชิก (<span id="tab-count-members">0</span>)
       </button>
-      <a id="tab-link-summary" href="#" class="tabs-link" style="display:flex;align-items:center;justify-content:center;gap:0.25rem;" role="button">
+      <button type="button" id="tab-btn-summary" onclick="switchTab('summary')">
         สรุปโอน ⚡
-      </a>
+      </button>
     </nav>
 
     <!-- Tab 1: รายการ (Expenses) -->
@@ -262,6 +262,39 @@
         </div>
         <div id="members-list">
           <!-- Rendered members -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: สรุปโอน (in-page, same session — no navigation) -->
+    <section id="section-summary" class="tab-content">
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+        <div>
+          <h2 style="margin:0;font-size:1.1rem;">💸 ใครต้องโอนใคร</h2>
+          <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;">
+            ยอดสุทธิ = จ่ายจริง − ส่วนที่กิน
+          </p>
+        </div>
+        <div id="plan-status-badge"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          <h3 style="margin:0;">👥 ยอดต่อคน</h3>
+        </div>
+        <div id="summary-members-list"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin:0.25rem 0.15rem 0.65rem;">
+        <h3 style="margin:0;font-size:1rem;">รายการต้องโอน</h3>
+        <button type="button" class="btn btn-sm btn-ghost" onclick="copyTransfersOnly()">📋 คัดลอก</button>
+      </div>
+      <div id="summary-transfers-list"></div>
+
+      <div class="card" style="margin-top:0.85rem;">
+        <div class="btn-row" style="flex-direction:column;">
+          <button type="button" class="btn btn-primary btn-block" onclick="shareSummaryAll()">📤 คัดลอกสรุปทั้งก้อน</button>
+          <button type="button" class="btn btn-block" onclick="copyTransfersOnly()">💸 คัดลอกเฉพาะรายการโอน</button>
         </div>
       </div>
     </section>
@@ -400,23 +433,6 @@
         }, 1600);
       });
 
-      // Update link to summary (must keep ?id= or page bounces home)
-      const summaryLink = document.getElementById('tab-link-summary');
-      if (summaryLink) {
-        const summaryHref = AomUI.pageUrl('summary.html', { id: currentSession.id });
-        summaryLink.href = summaryHref;
-        summaryLink.addEventListener('click', function (e) {
-          e.preventDefault();
-          // บันทึก state ล่าสุดก่อนไปหน้าสรุป
-          try {
-            AomStore.upsertSession(currentSession);
-          } catch (err) {
-            /* continue anyway */
-          }
-          AomUI.go('summary.html', { id: currentSession.id });
-        });
-      }
-
       // Setup Session Title Listener (auto-save on change + debounce while typing)
       const titleInput = document.getElementById('session-title-input');
       titleInput.value = currentSession.title || 'ทริปกินเหล้า';
@@ -447,29 +463,54 @@
 
       // Initial Render
       render();
+
+      // Deep link: session.html?id=...&tab=summary
+      const initialTab = AomUI.getQuery('tab');
+      if (initialTab === 'summary' || initialTab === 'members' || initialTab === 'expenses') {
+        switchTab(initialTab);
+      }
     });
 
-    // Tab Switching
+    // Tab Switching — all in-page (no navigation)
     function switchTab(tab) {
-      activeTab = tab;
+      activeTab = tab || 'expenses';
       const btnExpenses = document.getElementById('tab-btn-expenses');
       const btnMembers = document.getElementById('tab-btn-members');
+      const btnSummary = document.getElementById('tab-btn-summary');
       const secExpenses = document.getElementById('section-expenses');
       const secMembers = document.getElementById('section-members');
+      const secSummary = document.getElementById('section-summary');
       const fab = document.getElementById('fab-add-expense');
 
-      if (tab === 'expenses') {
-        btnExpenses.classList.add('active');
-        btnMembers.classList.remove('active');
-        secExpenses.classList.add('active');
-        secMembers.classList.remove('active');
-        fab.style.display = 'flex';
+      [btnExpenses, btnMembers, btnSummary].forEach(function (b) {
+        if (b) b.classList.remove('active');
+      });
+      [secExpenses, secMembers, secSummary].forEach(function (s) {
+        if (s) s.classList.remove('active');
+      });
+
+      if (activeTab === 'members') {
+        if (btnMembers) btnMembers.classList.add('active');
+        if (secMembers) secMembers.classList.add('active');
+        if (fab) fab.style.display = 'none';
+      } else if (activeTab === 'summary') {
+        if (btnSummary) btnSummary.classList.add('active');
+        if (secSummary) secSummary.classList.add('active');
+        if (fab) fab.style.display = 'none';
+        try {
+          AomStore.upsertSession(currentSession);
+        } catch (e) { /* ignore */ }
+        renderSummary();
+        try {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (e2) {
+          window.scrollTo(0, 0);
+        }
       } else {
-        btnMembers.classList.add('active');
-        btnExpenses.classList.remove('active');
-        secMembers.classList.add('active');
-        secExpenses.classList.remove('active');
-        fab.style.display = 'none';
+        activeTab = 'expenses';
+        if (btnExpenses) btnExpenses.classList.add('active');
+        if (secExpenses) secExpenses.classList.add('active');
+        if (fab) fab.style.display = 'flex';
       }
     }
 
@@ -492,6 +533,10 @@
     function render() {
       if (!currentSession) return;
 
+      // reload from store so summary always matches saved data
+      const fresh = AomStore.getSession(currentSession.id);
+      if (fresh) currentSession = fresh;
+
       const members = currentSession.members || [];
       const expenses = (currentSession.expenses || []).filter(function (e) { return !e.deleted; });
 
@@ -504,6 +549,176 @@
 
       // Render Members Section
       renderMembersList(members, expenses);
+
+      if (activeTab === 'summary') {
+        renderSummary();
+      }
+    }
+
+    function escapeAttr(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderSummary() {
+      if (!currentSession) return;
+      const membersBox = document.getElementById('summary-members-list');
+      const transfersBox = document.getElementById('summary-transfers-list');
+      const badgeEl = document.getElementById('plan-status-badge');
+      if (!membersBox || !transfersBox) return;
+
+      let plan;
+      try {
+        plan = AomMoney.recompute(currentSession);
+      } catch (err) {
+        membersBox.innerHTML = '<div class="muted">คำนวณไม่สำเร็จ: ' + escapeHtml(err && err.message) + '</div>';
+        transfersBox.innerHTML = '';
+        return;
+      }
+
+      if (badgeEl) {
+        badgeEl.innerHTML = plan.ok
+          ? '<span class="badge ok">✓ ยอดสมดุล</span>'
+          : '<span class="badge warn">⚠️ ไม่สมดุล (' + AomMoney.formatSigned(plan.sumCheck) + ')</span>';
+      }
+
+      const members = currentSession.members || [];
+      if (!members.length) {
+        membersBox.innerHTML = '<div class="empty">ยังไม่มีสมาชิก</div>';
+      } else {
+        membersBox.innerHTML = members.map(function (m) {
+          const owed = plan.owed[m.id] || 0;
+          const paid = plan.paid[m.id] || 0;
+          const bal = plan.balances[m.id] || 0;
+          let balClass = 'money';
+          let status = '<span class="badge">ลงตัว</span>';
+          if (bal > 0) {
+            balClass = 'money pos';
+            status = '<span class="badge ok">ได้คืน</span>';
+          } else if (bal < 0) {
+            balClass = 'money neg';
+            status = '<span class="badge warn">ต้องโอน</span>';
+          }
+          return (
+            '<div style="padding:0.75rem 0;border-bottom:1px solid var(--border);">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.45rem;">' +
+                '<div style="display:flex;align-items:center;gap:0.55rem;">' +
+                  AomUI.avatar(currentSession, m.id, 32) +
+                  '<strong>' + escapeHtml(m.displayName) + '</strong>' +
+                '</div>' + status +
+              '</div>' +
+              '<div class="stat-row">' +
+                '<div class="s"><div class="l">กิน</div><div class="v money">' + AomMoney.formatMoney(owed) + '</div></div>' +
+                '<div class="s"><div class="l">จ่าย</div><div class="v money">' + AomMoney.formatMoney(paid) + '</div></div>' +
+                '<div class="s"><div class="l">สุทธิ</div><div class="v ' + balClass + '">' + AomMoney.formatSigned(bal) + '</div></div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      if (!plan.transfers || !plan.transfers.length) {
+        transfersBox.innerHTML =
+          '<div class="card empty">' +
+          '<div style="font-size:2rem;margin-bottom:0.35rem;">🎉</div>' +
+          '<div style="font-weight:700;color:var(--good);">ลงตัวแล้ว</div>' +
+          '<div class="muted" style="font-size:0.88rem;">ไม่ต้องโอนเพิ่ม</div>' +
+          '</div>';
+        return;
+      }
+
+      transfersBox.innerHTML = plan.transfers.map(function (t, idx) {
+        const fromName = AomUI.memberName(currentSession, t.from);
+        const toName = AomUI.memberName(currentSession, t.to);
+        const amtStr = AomMoney.formatMoney(t.amountMinor);
+        const tKey = AomStore.transferKey(t);
+        const isDone = !!(currentSession.transferMarks && currentSession.transferMarks[tKey] && currentSession.transferMarks[tKey].done);
+        return (
+          '<div class="card transfer-card' + (isDone ? ' done' : '') + '" style="margin-bottom:0.65rem;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">' +
+              '<div style="display:flex;align-items:center;gap:0.4rem;font-weight:700;flex-wrap:wrap;">' +
+                AomUI.avatar(currentSession, t.from, 28) +
+                '<span>' + escapeHtml(fromName) + '</span>' +
+                '<span style="color:var(--muted)">→</span>' +
+                AomUI.avatar(currentSession, t.to, 28) +
+                '<span>' + escapeHtml(toName) + '</span>' +
+              '</div>' +
+              (isDone ? '<span class="badge ok">✓ โอนแล้ว</span>' : '') +
+            '</div>' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-top:0.65rem;flex-wrap:wrap;">' +
+              '<div class="money big">' + amtStr + '</div>' +
+              '<div class="btn-row">' +
+                '<button type="button" class="btn btn-sm" onclick="copyOneTransfer(' + idx + ')">📋</button>' +
+                '<button type="button" class="btn btn-sm ' + (isDone ? 'btn-ghost' : 'btn-primary') + '" onclick="toggleTransferDone(' + JSON.stringify(tKey) + ',' + (isDone ? 'false' : 'true') + ')">' +
+                  (isDone ? 'ยกเลิก' : '✓ โอนแล้ว') +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function shareSummaryAll() {
+      try {
+        const plan = AomMoney.recompute(currentSession);
+        AomUI.copyText(AomUI.buildShareText(currentSession, plan));
+      } catch (err) {
+        AomUI.toast((err && err.message) || 'แชร์ไม่สำเร็จ');
+      }
+    }
+
+    function copyTransfersOnly() {
+      try {
+        const plan = AomMoney.recompute(currentSession);
+        if (!plan.transfers || !plan.transfers.length) {
+          AomUI.copyText('✅ ลงตัวแล้ว ไม่ต้องโอนเพิ่ม');
+          return;
+        }
+        const lines = plan.transfers.map(function (t) {
+          return (
+            AomUI.memberName(currentSession, t.from) +
+            ' → ' +
+            AomUI.memberName(currentSession, t.to) +
+            ' ' +
+            AomMoney.formatMoney(t.amountMinor)
+          );
+        });
+        AomUI.copyText('— รายการโอน —\n' + lines.join('\n'));
+      } catch (err) {
+        AomUI.toast((err && err.message) || 'คัดลอกไม่สำเร็จ');
+      }
+    }
+
+    function copyOneTransfer(idx) {
+      try {
+        const plan = AomMoney.recompute(currentSession);
+        const t = plan.transfers[idx];
+        if (!t) return;
+        const text =
+          AomUI.memberName(currentSession, t.from) +
+          ' โอนให้ ' +
+          AomUI.memberName(currentSession, t.to) +
+          ' ' +
+          AomMoney.formatMoney(t.amountMinor);
+        AomUI.copyText(text);
+      } catch (err) {
+        AomUI.toast('คัดลอกไม่สำเร็จ');
+      }
+    }
+
+    function toggleTransferDone(key, done) {
+      try {
+        AomStore.markTransfer(currentSession.id, key, done);
+        const fresh = AomStore.getSession(currentSession.id);
+        if (fresh) currentSession = fresh;
+        renderSummary();
+        AomUI.toast(done ? 'ติ๊กโอนแล้ว' : 'ยกเลิกเครื่องหมาย');
+      } catch (err) {
+        AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
+      }
     }
 
     // Render Expenses List
