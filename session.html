@@ -191,7 +191,8 @@
       ‹ หน้าแรก
     </a>
     <div class="spacer"></div>
-    <div class="sub" id="session-date-badge"></div>
+    <span id="save-pill" class="save-pill" title="ทริปนี้ถูกเก็บในเบราว์เซอร์เครื่องนี้">💾 บันทึกอัตโนมัติ</span>
+    <div class="sub" id="session-date-badge" style="margin-left:0.35rem;"></div>
   </header>
 
   <main class="container">
@@ -374,21 +375,54 @@
         return;
       }
 
+      if (!AomStore.isStorageAvailable()) {
+        AomUI.toast('คำเตือน: เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้');
+        const pill = document.getElementById('save-pill');
+        if (pill) {
+          pill.textContent = '⚠️ บันทึกไม่ได้';
+          pill.style.color = 'var(--bad)';
+          pill.style.borderColor = 'rgba(255,107,107,0.4)';
+          pill.style.background = 'rgba(255,107,107,0.1)';
+        }
+      }
+
+      window.addEventListener('aom-split-saved', function () {
+        const pill = document.getElementById('save-pill');
+        if (!pill) return;
+        pill.textContent = '💾 บันทึกแล้ว';
+        pill.classList.remove('flash');
+        void pill.offsetWidth;
+        pill.classList.add('flash');
+        clearTimeout(pill._t);
+        pill._t = setTimeout(function () {
+          pill.textContent = '💾 บันทึกอัตโนมัติ';
+        }, 1600);
+      });
+
       // Update link to summary
       const summaryLink = document.getElementById('tab-link-summary');
       if (summaryLink) {
         summaryLink.href = 'summary.html?id=' + encodeURIComponent(currentSession.id);
       }
 
-      // Setup Session Title Listener
+      // Setup Session Title Listener (auto-save on change + debounce while typing)
       const titleInput = document.getElementById('session-title-input');
       titleInput.value = currentSession.title || 'ทริปกินเหล้า';
-      titleInput.addEventListener('change', function () {
-        const val = this.value.trim();
+      let titleTimer = null;
+      function saveTitle() {
+        const val = titleInput.value.trim();
         currentSession.title = val || 'ทริปกินเหล้า';
-        AomStore.upsertSession(currentSession);
-        AomUI.toast('บันทึกชื่อทริปแล้ว');
+        try {
+          AomStore.upsertSession(currentSession);
+        } catch (err) {
+          AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
+        }
+      }
+      titleInput.addEventListener('input', function () {
+        clearTimeout(titleTimer);
+        titleTimer = setTimeout(saveTitle, 450);
       });
+      titleInput.addEventListener('change', saveTitle);
 
       // Date badge
       const dateBadge = document.getElementById('session-date-badge');

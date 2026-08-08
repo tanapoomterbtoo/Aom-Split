@@ -39,6 +39,22 @@
       </div>
     </section>
 
+    <!-- Persistence notice + backup -->
+    <div id="save-banner" class="save-banner">
+      <div class="icon">💾</div>
+      <div class="body">
+        <div class="title">บันทึกอัตโนมัติบนเครื่องนี้</div>
+        <div class="desc" id="save-banner-desc">
+          ทริป รายการจ่าย และสรุปโอนถูกเก็บในเบราว์เซอร์ — เปิดกลับมาเมื่อไหร่ก็เจอข้อมูลเดิม
+        </div>
+        <div class="backup-row">
+          <button type="button" id="btn-export" class="btn btn-sm btn-ghost">⬇️ ส่งออกสำรอง</button>
+          <button type="button" id="btn-import" class="btn btn-sm btn-ghost">⬆️ นำเข้าสำรอง</button>
+          <input type="file" id="input-import" accept="application/json,.json" hidden />
+        </div>
+      </div>
+    </div>
+
     <!-- Session List Section -->
     <section>
       <div class="card-h" style="padding: 0 0.25rem;">
@@ -91,6 +107,38 @@
       const titleInput = document.getElementById("input-title");
       const membersInput = document.getElementById("input-members");
 
+      function formatWhen(ts) {
+        if (!ts) return "—";
+        try {
+          return new Date(ts).toLocaleString("th-TH", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          });
+        } catch (e) {
+          return String(ts);
+        }
+      }
+
+      function refreshSaveBanner() {
+        const banner = document.getElementById("save-banner");
+        const desc = document.getElementById("save-banner-desc");
+        if (!banner || !desc) return;
+        const info = AomStore.storageInfo();
+        if (!info.available) {
+          banner.classList.add("warn");
+          desc.textContent =
+            "เบราว์เซอร์นี้บันทึกไม่ได้ (อาจเป็นโหมดส่วนตัว) — ข้อมูลจะหายเมื่อปิดแท็บ";
+          return;
+        }
+        banner.classList.remove("warn");
+        desc.innerHTML =
+          "ทริปและรายการถูกเก็บในเบราว์เซอร์เครื่องนี้ · " +
+          info.sessionCount +
+          " ทริป · บันทึกล่าสุด " +
+          formatWhen(info.savedAt) +
+          "<br/><span style=\"opacity:0.9\">ใช้เครื่อง/เบราว์เซอร์เดิมจะเจอข้อมูลเดิม · อยากย้ายเครื่องให้ส่งออกสำรอง</span>";
+      }
+
       function openModal() {
         titleInput.value = "";
         membersInput.value = "";
@@ -120,9 +168,13 @@
           return;
         }
 
-        const session = AomStore.createSession(title, names);
-        closeModal();
-        location.href = "session.html?id=" + encodeURIComponent(session.id);
+        try {
+          const session = AomStore.createSession(title, names);
+          closeModal();
+          location.href = "session.html?id=" + encodeURIComponent(session.id);
+        } catch (err) {
+          AomUI.toast((err && err.message) || "บันทึกไม่สำเร็จ");
+        }
       }
 
       function handleDeleteSession(e, id, title) {
@@ -247,11 +299,50 @@
       document.getElementById("btn-modal-cancel").addEventListener("click", closeModal);
       document.getElementById("form-create-session").addEventListener("submit", handleCreateSession);
 
+      document.getElementById("btn-export").addEventListener("click", function () {
+        try {
+          AomStore.downloadBackup();
+          AomUI.toast("ส่งออกไฟล์สำรองแล้ว");
+        } catch (err) {
+          AomUI.toast((err && err.message) || "ส่งออกไม่สำเร็จ");
+        }
+      });
+
+      document.getElementById("btn-import").addEventListener("click", function () {
+        document.getElementById("input-import").click();
+      });
+
+      document.getElementById("input-import").addEventListener("change", function (e) {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = "";
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function () {
+          try {
+            const n = AomStore.importData(String(reader.result || ""), "merge");
+            AomUI.toast("นำเข้าสำเร็จ · รวม " + n + " ทริป");
+            refreshSaveBanner();
+            render();
+          } catch (err) {
+            AomUI.toast((err && err.message) || "นำเข้าไม่สำเร็จ");
+          }
+        };
+        reader.onerror = function () {
+          AomUI.toast("อ่านไฟล์ไม่สำเร็จ");
+        };
+        reader.readAsText(file, "utf-8");
+      });
+
       modalEl.addEventListener("click", function (e) {
         if (e.target === modalEl) closeModal();
       });
 
+      window.addEventListener("aom-split-saved", function () {
+        refreshSaveBanner();
+      });
+
       // Initial render
+      refreshSaveBanner();
       render();
     })();
   </script>

@@ -22,7 +22,8 @@
       </div>
     </a>
     <div class="spacer"></div>
-    <button type="button" class="btn btn-sm btn-ghost" id="btn-share-top" title="แชร์สรุป">
+    <span id="save-pill" class="save-pill" title="ข้อมูลเก็บบนเครื่องนี้">💾 บันทึกอัตโนมัติ</span>
+    <button type="button" class="btn btn-sm btn-ghost" id="btn-share-top" title="แชร์สรุป" style="margin-left:0.35rem;">
       📤 แชร์
     </button>
   </header>
@@ -112,6 +113,19 @@
         location.href = "index.html";
         return;
       }
+
+      window.addEventListener("aom-split-saved", function () {
+        const pill = document.getElementById("save-pill");
+        if (!pill) return;
+        pill.textContent = "💾 บันทึกแล้ว";
+        pill.classList.remove("flash");
+        void pill.offsetWidth;
+        pill.classList.add("flash");
+        clearTimeout(pill._t);
+        pill._t = setTimeout(function () {
+          pill.textContent = "💾 บันทึกอัตโนมัติ";
+        }, 1600);
+      });
 
       // 3. Configure Navigation Tabs with Session ID
       const tabItems = document.getElementById("tab-items");
