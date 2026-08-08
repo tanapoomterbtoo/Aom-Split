@@ -247,83 +247,6 @@
     return transfers;
   }
 
-  /** Demo session from plan §1 (อาร์ม บีม ชา) */
-  function demoSession() {
-    const arm = "m_arm";
-    const beam = "m_beam";
-    const cha = "m_cha";
-    return {
-      id: "demo_arm_beam_cha",
-      title: "คืนนี้สุขุมวิท (ตัวอย่าง)",
-      date: new Date().toISOString().slice(0, 10),
-      currency: "THB",
-      status: "open",
-      members: [
-        { id: arm, displayName: "อาร์ม", color: "#c9a227" },
-        { id: beam, displayName: "บีม", color: "#3498db" },
-        { id: cha, displayName: "ชา", color: "#e67e22" },
-      ],
-      expenses: [
-        {
-          id: "e1",
-          title: "เบียร์ถัง",
-          amountMinor: 90000,
-          paidByMemberId: arm,
-          splitMode: "equal",
-          participants: [arm, beam, cha],
-        },
-        {
-          id: "e2",
-          title: "วิสกี้ช็อต ×6",
-          amountMinor: 120000,
-          paidByMemberId: beam,
-          splitMode: "shares",
-          participants: [arm, beam, cha],
-          shares: { [arm]: 2, [beam]: 3, [cha]: 1 },
-        },
-        {
-          id: "e3",
-          title: "ไก่ทอด",
-          amountMinor: 30000,
-          paidByMemberId: cha,
-          splitMode: "equal",
-          participants: [arm, beam, cha],
-        },
-        {
-          id: "e4",
-          title: "ค็อกเทล",
-          amountMinor: 25000,
-          paidByMemberId: arm,
-          splitMode: "equal",
-          participants: [cha],
-        },
-        {
-          id: "e5",
-          title: "ทิป / ค่าบริการ",
-          amountMinor: 10000,
-          paidByMemberId: beam,
-          splitMode: "equal",
-          participants: [arm, beam, cha],
-        },
-      ],
-      transferMarks: {},
-      createdAt: Date.now(),
-    };
-  }
-
-  // Self-check demo
-  function selfCheck() {
-    const s = demoSession();
-    const r = recompute(s);
-    const issues = [];
-    if (!r.ok) issues.push("sum balances != 0: " + r.sumCheck);
-    const totalPaid = Object.keys(r.paid).reduce(function (a, k) {
-      return a + r.paid[k];
-    }, 0);
-    if (totalPaid !== 275000) issues.push("total paid expected 275000 got " + totalPaid);
-    return { ok: issues.length === 0, issues: issues, result: r };
-  }
-
   global.AomMoney = {
     satang: satang,
     bahtToMinor: bahtToMinor,
@@ -334,7 +257,5 @@
     resolveSplits: resolveSplits,
     recompute: recompute,
     minimizeTransfers: minimizeTransfers,
-    demoSession: demoSession,
-    selfCheck: selfCheck,
   };
 })(typeof window !== "undefined" ? window : globalThis);

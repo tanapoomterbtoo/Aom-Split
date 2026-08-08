@@ -90,15 +90,6 @@
     return upsertSession(session);
   }
 
-  function seedDemoIfEmpty() {
-    const data = load();
-    if (data.sessions.length) return null;
-    if (!global.AomMoney) return null;
-    const demo = global.AomMoney.demoSession();
-    demo.updatedAt = Date.now();
-    return upsertSession(demo);
-  }
-
   function markTransfer(sessionId, key, done) {
     const s = getSession(sessionId);
     if (!s) return null;
@@ -124,7 +115,6 @@
     upsertSession: upsertSession,
     deleteSession: deleteSession,
     createSession: createSession,
-    seedDemoIfEmpty: seedDemoIfEmpty,
     markTransfer: markTransfer,
     transferKey: transferKey,
   };
