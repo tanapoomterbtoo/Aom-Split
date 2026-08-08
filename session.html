@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260808c"></script>
+  <script src="js/boot.js?v=20260808d"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260808c">
+  <link rel="stylesheet" href="css/app.css?v=20260808d">
   <style>
     .session-title-input {
       background: transparent;
@@ -376,9 +376,9 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260808c"></script>
-  <script src="js/store.js?v=20260808c"></script>
-  <script src="js/ui.js?v=20260808c"></script>
+  <script src="js/money.js?v=20260808d"></script>
+  <script src="js/store.js?v=20260808d"></script>
+  <script src="js/ui.js?v=20260808d"></script>
 
   <script>
     // App State
@@ -647,6 +647,7 @@
         const amtStr = AomMoney.formatMoney(t.amountMinor);
         const tKey = AomStore.transferKey(t);
         const isDone = !!(currentSession.transferMarks && currentSession.transferMarks[tKey] && currentSession.transferMarks[tKey].done);
+        // ใช้ data-* + listener — ห้ามใส่ JSON ใน onclick="..." (เครื่องหมาย " ซ้อนแล้ว HTML แตก)
         return (
           '<div class="card transfer-card' + (isDone ? ' done' : '') + '" style="margin-bottom:0.65rem;">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">' +
@@ -662,8 +663,8 @@
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-top:0.65rem;flex-wrap:wrap;">' +
               '<div class="money big">' + amtStr + '</div>' +
               '<div class="btn-row">' +
-                '<button type="button" class="btn btn-sm" onclick="copyOneTransfer(' + idx + ')">📋</button>' +
-                '<button type="button" class="btn btn-sm ' + (isDone ? 'btn-ghost' : 'btn-primary') + '" onclick="toggleTransferDone(' + JSON.stringify(tKey) + ',' + (isDone ? 'false' : 'true') + ')">' +
+                '<button type="button" class="btn btn-sm btn-copy-transfer" data-idx="' + idx + '">📋 คัดลอก</button>' +
+                '<button type="button" class="btn btn-sm btn-mark-transfer ' + (isDone ? 'btn-ghost' : 'btn-primary') + '" data-key="' + escapeAttr(tKey) + '" data-done="' + (isDone ? '1' : '0') + '">' +
                   (isDone ? 'ยกเลิก' : '✓ โอนแล้ว') +
                 '</button>' +
               '</div>' +
@@ -671,6 +672,20 @@
           '</div>'
         );
       }).join('');
+
+      transfersBox.querySelectorAll('.btn-copy-transfer').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var idx = parseInt(btn.getAttribute('data-idx'), 10);
+          copyOneTransfer(idx);
+        });
+      });
+      transfersBox.querySelectorAll('.btn-mark-transfer').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var key = btn.getAttribute('data-key') || '';
+          var currentlyDone = btn.getAttribute('data-done') === '1';
+          toggleTransferDone(key, !currentlyDone);
+        });
+      });
     }
 
     function shareSummaryAll() {
