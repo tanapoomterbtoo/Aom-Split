@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810b"></script>
+  <script src="js/boot.js?v=20260810c"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Aom Split — หารค่าเหล้าเพื่อน (Who Owes Whom)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/app.css?v=20260810b" />
+  <link rel="stylesheet" href="css/app.css?v=20260810c" />
 </head>
 <body>
   <!-- App Header -->
@@ -47,12 +47,12 @@
         <span id="remote-badge" class="badge ok">พร้อมใช้</span>
       </div>
       <p class="muted" style="margin:0 0 0.45rem; font-size:0.85rem;">
-        ทริปของทุกคนซิงก์ขึ้น Google Sheet ชุดเดียวกันอัตโนมัติ — เปิดแอปแล้วใช้ได้เลย ไม่ต้องตั้งค่า
+        ซิงก์อัตโนมัติกับกลุ่ม — บันทึกแล้วอัปทันที · ดึงของเพื่อนทุก ~12 วินาที · กลับมาที่แท็บแล้วดึงใหม่
       </p>
       <div class="btn-row">
         <button type="button" id="btn-remote-sync" class="btn btn-sm btn-primary">🔄 ซิงก์ตอนนี้</button>
       </div>
-      <div id="remote-status" class="remote-status pending">กำลังเชื่อมฐานข้อมูลกลุ่ม…</div>
+      <div id="remote-status" class="remote-status pending">กำลังเปิดซิงก์อัตโนมัติ…</div>
     </section>
 
     <!-- Persistence notice + backup -->
@@ -114,9 +114,9 @@
   </div>
 
   <!-- Scripts in required order -->
-  <script src="js/money.js?v=20260810b"></script>
-  <script src="js/store.js?v=20260810b"></script>
-  <script src="js/ui.js?v=20260810b"></script>
+  <script src="js/money.js?v=20260810c"></script>
+  <script src="js/store.js?v=20260810c"></script>
+  <script src="js/ui.js?v=20260810c"></script>
   <script>
     (function () {
       const modalEl = document.getElementById("modal-create");
@@ -430,11 +430,19 @@
       window.addEventListener("aom-split-remote", function () {
         refreshRemoteUi();
       });
+      window.addEventListener("aom-split-pulled", function (ev) {
+        refreshRemoteUi();
+        if (ev && ev.detail && ev.detail.changed) {
+          render();
+          refreshSaveBanner();
+        }
+      });
 
-      // พร้อมใช้ทันที — ซิงก์กลุ่มอัตโนมัติตอนเปิดแอป
+      // ซิงก์ครบตอนเปิด + เปิด auto-pull รอบ ๆ
       refreshRemoteUi();
       refreshSaveBanner();
       render();
+      AomStore.startAutoSync();
 
       AomStore.syncNow()
         .then(function () {

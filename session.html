@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810b"></script>
+  <script src="js/boot.js?v=20260810c"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260810b">
+  <link rel="stylesheet" href="css/app.css?v=20260810c">
   <style>
     .session-title-input {
       background: transparent;
@@ -377,10 +377,10 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260810b"></script>
-  <script src="js/store.js?v=20260810b"></script>
-  <script src="js/ui.js?v=20260810b"></script>
-  <script src="js/summary-view.js?v=20260810b"></script>
+  <script src="js/money.js?v=20260810c"></script>
+  <script src="js/store.js?v=20260810c"></script>
+  <script src="js/ui.js?v=20260810c"></script>
+  <script src="js/summary-view.js?v=20260810c"></script>
 
   <script>
     // App State
@@ -476,6 +476,36 @@
           updateSavePillFromRemote();
         });
 
+        // เพื่อนอัปเดตจากเครื่องอื่น → รีเฟรชทริปนี้ (ไม่ทับตอนกำลังพิมพ์ชื่อ)
+        window.addEventListener('aom-split-pulled', function (ev) {
+          if (!ev || !ev.detail || !ev.detail.changed) return;
+          if (!currentSession || !currentSession.id) return;
+          var titleInputEl = document.getElementById('session-title-input');
+          if (titleInputEl && document.activeElement === titleInputEl) return;
+          // อย่ารีเฟรชถ้าเปิด modal แก้รายการอยู่
+          var expModal = document.getElementById('expense-modal');
+          if (expModal && expModal.classList.contains('show')) return;
+
+          var fresh = AomStore.getSession(currentSession.id);
+          if (!fresh) {
+            AomUI.toast('ทริปนี้ถูกลบจากกลุ่มแล้ว');
+            AomUI.go('index.html');
+            return;
+          }
+          var oldTs = currentSession.updatedAt || 0;
+          var newTs = fresh.updatedAt || 0;
+          if (newTs === oldTs && JSON.stringify(fresh.expenses) === JSON.stringify(currentSession.expenses)) {
+            return;
+          }
+          currentSession = fresh;
+          if (titleInputEl && document.activeElement !== titleInputEl) {
+            titleInputEl.value = currentSession.title || 'ทริปกินเหล้า';
+          }
+          var dateBadgeEl = document.getElementById('session-date-badge');
+          if (dateBadgeEl) dateBadgeEl.textContent = currentSession.date || '';
+          render();
+        });
+
         // Setup Session Title Listener (auto-save on change + debounce while typing)
         const titleInput = document.getElementById('session-title-input');
         titleInput.value = currentSession.title || 'ทริปกินเหล้า';
@@ -506,6 +536,9 @@
 
         // Initial Render
         render();
+
+        // เปิดซิงก์อัตโนมัติขณะอยู่ในหน้าทริป
+        AomStore.startAutoSync();
 
         // Deep link: session.html?id=...&tab=summary
         const initialTab = AomUI.getQuery('tab');
