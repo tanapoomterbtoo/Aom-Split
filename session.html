@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810d"></script>
+  <script src="js/boot.js?v=20260810e"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260810d">
+  <link rel="stylesheet" href="css/app.css?v=20260810e">
   <style>
     .session-title-input {
       background: transparent;
@@ -182,6 +182,43 @@
       color: var(--muted);
       margin-top: 0.35rem;
     }
+    .pp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--info);
+      background: rgba(91, 157, 255, 0.12);
+      border: 1px solid rgba(91, 157, 255, 0.3);
+      border-radius: 999px;
+      padding: 0.12rem 0.45rem;
+      margin-top: 0.2rem;
+    }
+    .pp-qr-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.5rem 0 0.25rem;
+    }
+    .pp-qr-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 0.75rem;
+      line-height: 0;
+    }
+    .pp-qr-box img, .pp-qr-box canvas {
+      display: block;
+      width: 220px;
+      height: 220px;
+    }
+    .pp-hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -256,6 +293,14 @@
         </form>
       </div>
 
+      <div class="card" style="border-color: rgba(91,157,255,0.28); background: rgba(91,157,255,0.06);">
+        <div style="font-weight:700; margin-bottom:0.25rem;">📱 พร้อมเพย์ (ผู้รับกรอกเอง)</div>
+        <p class="muted" style="margin:0; font-size:0.85rem;">
+          แต่ละคนใส่ <strong>เบอร์มือถือ</strong> หรือ <strong>เลขบัตรประชาชน</strong> ที่ผูกพร้อมเพย์
+          — ตอนสรุปโอน เพื่อนจะสแกน QR จ่ายยอดที่ต้องโอนได้ทันที
+        </p>
+      </div>
+
       <!-- Members List Card -->
       <div class="card">
         <div class="card-h">
@@ -306,6 +351,56 @@
   <button type="button" id="fab-add-expense" class="fab" onclick="openExpenseModal()">
     <span style="font-size: 1.25rem; line-height: 1;">+</span> เพิ่มรายการ
   </button>
+
+  <!-- PromptPay: ตั้งหมายเลขผู้รับ -->
+  <div id="pp-setup-modal" class="modal-backdrop" onclick="if(event.target===this)closePromptPaySetup()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="card-h">
+        <h3 id="pp-setup-title">ตั้งพร้อมเพย์</h3>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closePromptPaySetup()">✕</button>
+      </div>
+      <p class="muted" style="margin:0 0 0.75rem; font-size:0.85rem;">
+        ใส่เบอร์มือถือ (10 หลัก) หรือเลขบัตรประชาชน (13 หลัก) ที่ผูกพร้อมเพย์ — คนอื่นจะโอนเข้าบัญชีนี้ได้
+      </p>
+      <div class="field">
+        <label for="pp-setup-input">เบอร์ / เลขบัตร ปชช.</label>
+        <input type="text" id="pp-setup-input" class="input" inputmode="numeric" placeholder="เช่น 0812345678 หรือ 1xxxxxxxxxxxxx" autocomplete="off" />
+      </div>
+      <div id="pp-setup-error" class="muted" style="color:var(--bad); font-size:0.82rem; min-height:1.2em;"></div>
+      <div class="btn-row" style="flex-direction:column; margin-top:0.75rem;">
+        <button type="button" class="btn btn-primary btn-block" onclick="savePromptPaySetup()">บันทึกพร้อมเพย์</button>
+        <button type="button" id="pp-setup-clear" class="btn btn-ghost btn-block" onclick="clearPromptPaySetup()">ลบหมายเลข</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PromptPay: QR จ่ายยอด -->
+  <div id="pp-pay-modal" class="modal-backdrop" onclick="if(event.target===this)closePromptPayPay()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="card-h">
+        <h3>จ่ายพร้อมเพย์</h3>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closePromptPayPay()">✕</button>
+      </div>
+      <div class="pp-qr-wrap">
+        <div style="text-align:center;">
+          <div class="muted" style="font-size:0.82rem;">โอนให้</div>
+          <div id="pp-pay-to" style="font-weight:700; font-size:1.1rem;">—</div>
+          <div id="pp-pay-id" class="muted" style="font-size:0.8rem; margin-top:0.15rem;">—</div>
+        </div>
+        <div class="money big" id="pp-pay-amount">฿0.00</div>
+        <div class="pp-qr-box" id="pp-pay-qr"></div>
+        <p class="pp-hint">
+          เปิดแอปธนาคาร → สแกน QR นี้<br/>
+          ยอดถูกระบุไว้แล้วตามสรุปโอน
+        </p>
+        <div class="btn-row" style="width:100%; flex-direction:column;">
+          <button type="button" class="btn btn-primary btn-block" onclick="markCurrentPromptPayDone()">✓ โอนแล้ว</button>
+          <button type="button" class="btn btn-block" onclick="copyPromptPayPayload()">📋 คัดลอก payload</button>
+          <button type="button" class="btn btn-ghost btn-block" onclick="closePromptPayPay()">ปิด</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Expense Modal / Sheet -->
   <div id="expense-modal" class="modal-backdrop" onclick="handleModalBackdropClick(event)">
@@ -377,14 +472,17 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260810d"></script>
-  <script src="js/store.js?v=20260810d"></script>
-  <script src="js/ui.js?v=20260810d"></script>
-  <script src="js/summary-view.js?v=20260810d"></script>
+  <script src="js/money.js?v=20260810e"></script>
+  <script src="js/store.js?v=20260810e"></script>
+  <script src="js/ui.js?v=20260810e"></script>
+  <script src="js/promptpay.js?v=20260810e"></script>
+  <script src="js/qrcode.min.js?v=20260810e"></script>
+  <script src="js/summary-view.js?v=20260810e"></script>
 
   <script>
     // App State
     let currentSession = null;
+    let lastPlan = null;
     let activeTab = 'expenses';
     let selectedColor = '#c9a227';
 
@@ -675,7 +773,7 @@
         }
         return;
       }
-      AomSummaryView.render({
+      lastPlan = AomSummaryView.render({
         session: currentSession,
         membersBox: document.getElementById('summary-members-list'),
         transfersBox: document.getElementById('summary-transfers-list'),
@@ -687,7 +785,133 @@
         onToggleDone: function (key, nextDone) {
           toggleTransferDone(key, nextDone);
         },
+        onPromptPay: openPromptPayPay,
+        onSetupPromptPay: openPromptPaySetup,
       });
+    }
+
+    /* ───── PromptPay ───── */
+    var ppSetupMemberId = null;
+    var ppPayContext = null;
+
+    function openPromptPaySetup(memberId) {
+      ppSetupMemberId = memberId;
+      var m = (currentSession.members || []).find(function (x) { return x.id === memberId; });
+      if (!m) {
+        AomUI.toast('ไม่พบสมาชิก');
+        return;
+      }
+      document.getElementById('pp-setup-title').textContent = 'ตั้งพร้อมเพย์ · ' + (m.displayName || '');
+      document.getElementById('pp-setup-input').value = AomPromptPay.memberPromptPay(m) || '';
+      document.getElementById('pp-setup-error').textContent = '';
+      document.getElementById('pp-setup-modal').classList.add('show');
+      setTimeout(function () {
+        var inp = document.getElementById('pp-setup-input');
+        if (inp) inp.focus();
+      }, 50);
+    }
+
+    function closePromptPaySetup() {
+      document.getElementById('pp-setup-modal').classList.remove('show');
+      ppSetupMemberId = null;
+    }
+
+    function savePromptPaySetup() {
+      if (!ppSetupMemberId) return;
+      var raw = document.getElementById('pp-setup-input').value;
+      var v = AomPromptPay.validateId(raw);
+      var errEl = document.getElementById('pp-setup-error');
+      if (!v.ok) {
+        errEl.textContent = v.message || 'หมายเลขไม่ถูกต้อง';
+        return;
+      }
+      var m = (currentSession.members || []).find(function (x) { return x.id === ppSetupMemberId; });
+      if (!m) return;
+      m.promptpay = v.digits;
+      try {
+        AomStore.upsertSession(currentSession);
+        closePromptPaySetup();
+        render();
+        AomUI.toast('บันทึกพร้อมเพย์ของ ' + m.displayName + ' แล้ว');
+      } catch (err) {
+        errEl.textContent = (err && err.message) || 'บันทึกไม่สำเร็จ';
+      }
+    }
+
+    function clearPromptPaySetup() {
+      if (!ppSetupMemberId) return;
+      var m = (currentSession.members || []).find(function (x) { return x.id === ppSetupMemberId; });
+      if (!m) return;
+      if (!confirm('ลบหมายเลขพร้อมเพย์ของ ' + m.displayName + ' ?')) return;
+      delete m.promptpay;
+      AomStore.upsertSession(currentSession);
+      closePromptPaySetup();
+      render();
+      AomUI.toast('ลบพร้อมเพย์แล้ว');
+    }
+
+    function openPromptPayPay(transfer, toMember) {
+      if (!toMember || !AomPromptPay.memberHasPromptPay(toMember)) {
+        openPromptPaySetup(transfer.to);
+        AomUI.toast('ผู้รับยังไม่ได้ตั้งพร้อมเพย์ — กรอกเบอร์หรือบัตร ปชช. ก่อน');
+        return;
+      }
+      var payload;
+      try {
+        payload = AomPromptPay.payloadForMember(toMember, transfer.amountMinor);
+      } catch (err) {
+        AomUI.toast((err && err.message) || 'สร้าง QR ไม่สำเร็จ');
+        return;
+      }
+      ppPayContext = {
+        transfer: transfer,
+        member: toMember,
+        payload: payload,
+        key: AomStore.transferKey(transfer),
+      };
+      document.getElementById('pp-pay-to').textContent =
+        toMember.displayName || AomUI.memberName(currentSession, transfer.to);
+      document.getElementById('pp-pay-id').textContent =
+        AomPromptPay.kindLabel(AomPromptPay.detectKind(AomPromptPay.memberPromptPay(toMember))) +
+        ' ' +
+        AomPromptPay.maskId(AomPromptPay.memberPromptPay(toMember));
+      document.getElementById('pp-pay-amount').textContent = AomMoney.formatMoney(transfer.amountMinor);
+
+      var qrBox = document.getElementById('pp-pay-qr');
+      qrBox.innerHTML = '';
+      if (typeof QRCode === 'undefined') {
+        qrBox.innerHTML = '<div class="muted" style="padding:1rem;color:#333;">โหลดตัวสร้าง QR ไม่ได้</div>';
+      } else {
+        try {
+          new QRCode(qrBox, {
+            text: payload,
+            width: 220,
+            height: 220,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M,
+          });
+        } catch (err) {
+          qrBox.innerHTML = '<div class="muted" style="padding:1rem;color:#333;">สร้าง QR ไม่สำเร็จ</div>';
+        }
+      }
+      document.getElementById('pp-pay-modal').classList.add('show');
+    }
+
+    function closePromptPayPay() {
+      document.getElementById('pp-pay-modal').classList.remove('show');
+      ppPayContext = null;
+    }
+
+    function copyPromptPayPayload() {
+      if (!ppPayContext || !ppPayContext.payload) return;
+      AomUI.copyText(ppPayContext.payload);
+    }
+
+    function markCurrentPromptPayDone() {
+      if (!ppPayContext || !ppPayContext.key) return;
+      toggleTransferDone(ppPayContext.key, true);
+      closePromptPayPay();
     }
 
     function shareSummaryAll() {
@@ -846,6 +1070,10 @@
       container.innerHTML = members.map(function (m) {
         const paidCount = expenses.filter(function (e) { return e.paidByMemberId === m.id; }).length;
         const partCount = expenses.filter(function (e) { return (e.participants || []).includes(m.id); }).length;
+        const hasPP = AomPromptPay.memberHasPromptPay(m);
+        const ppLine = hasPP
+          ? '<span class="pp-badge">📱 ' + escapeHtml(AomPromptPay.maskId(AomPromptPay.memberPromptPay(m))) + ' · ' + escapeHtml(AomPromptPay.kindLabel(AomPromptPay.detectKind(AomPromptPay.memberPromptPay(m)))) + '</span>'
+          : '<span class="muted" style="font-size:0.78rem;">ยังไม่ตั้งพร้อมเพย์</span>';
 
         return `
           <div class="member-item-row">
@@ -854,9 +1082,11 @@
               <div>
                 <div class="member-name">${escapeHtml(m.displayName)}</div>
                 <div class="member-stats">จ่ายไป ${paidCount} รายการ · มีส่วนร่วม ${partCount} รายการ</div>
+                <div style="margin-top:0.25rem;">${ppLine}</div>
               </div>
             </div>
-            <div>
+            <div class="btn-row" style="flex-direction:column; align-items:flex-end; gap:0.3rem;">
+              <button type="button" class="btn btn-sm ${hasPP ? '' : 'btn-primary'}" onclick="openPromptPaySetup('${m.id}')">${hasPP ? 'แก้พร้อมเพย์' : 'ตั้งพร้อมเพย์'}</button>
               <button type="button" class="btn btn-ghost btn-sm" style="color: var(--bad);" onclick="handleRemoveMember('${m.id}')">ลบ</button>
             </div>
           </div>

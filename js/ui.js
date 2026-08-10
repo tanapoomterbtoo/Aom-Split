@@ -211,13 +211,24 @@
     } else {
       lines.push("— ต้องโอน —");
       plan.transfers.forEach(function (t) {
-        lines.push(
+        var line =
           memberName(session, t.from) +
-            " → " +
-            memberName(session, t.to) +
-            " " +
-            AomMoney.formatMoney(t.amountMinor)
-        );
+          " → " +
+          memberName(session, t.to) +
+          " " +
+          AomMoney.formatMoney(t.amountMinor);
+        if (global.AomPromptPay) {
+          var toM = (session.members || []).find(function (m) {
+            return m.id === t.to;
+          });
+          if (toM && AomPromptPay.memberHasPromptPay(toM)) {
+            line +=
+              " (พร้อมเพย์ " +
+              AomPromptPay.maskId(AomPromptPay.memberPromptPay(toM)) +
+              ")";
+          }
+        }
+        lines.push(line);
       });
     }
     lines.push("");

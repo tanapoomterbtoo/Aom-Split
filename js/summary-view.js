@@ -1,9 +1,9 @@
 /**
  * Aom Split — summary / transfers view (DOM-only, no brittle HTML strings)
- * Build: 20260808e
+ * Build: 20260810e
  */
 (function (global) {
-  var BUILD = "20260808e";
+  var BUILD = "20260810e";
 
   function el(tag, props, children) {
     var node = document.createElement(tag);
@@ -43,9 +43,14 @@
   function avatarNode(session, id, size) {
     size = size || 28;
     var wrap = document.createElement("span");
-    // insert trusted small HTML from AomUI.avatar
     wrap.innerHTML = AomUI.avatar(session, id, size);
     return wrap.firstChild || wrap;
+  }
+
+  function findMember(session, id) {
+    return (session.members || []).find(function (m) {
+      return m.id === id;
+    });
   }
 
   /**
@@ -57,6 +62,8 @@
    * @param {HTMLElement} [opts.versionEl]
    * @param {function} opts.onToggleDone function(key, nextDone)
    * @param {function} opts.onCopyOne function(idx)
+   * @param {function} [opts.onPromptPay] function(transfer, toMember)
+   * @param {function} [opts.onSetupPromptPay] function(memberId)
    */
   function render(opts) {
     var session = opts.session;
@@ -117,6 +124,11 @@
           statusClass = "badge warn";
         }
 
+        var hasPP =
+          global.AomPromptPay && AomPromptPay.memberHasPromptPay
+            ? AomPromptPay.memberHasPromptPay(m)
+            : false;
+
         var row = el("div", {
           style: {
             padding: "0.75rem 0",
@@ -130,20 +142,45 @@
             alignItems: "center",
             justifyContent: "space-between",
             marginBottom: "0.45rem",
+            gap: "0.5rem",
+            flexWrap: "wrap",
           },
         });
         var left = el("div", {
           style: { display: "flex", alignItems: "center", gap: "0.55rem" },
         });
         left.appendChild(avatarNode(session, m.id, 32));
-        left.appendChild(el("strong", { text: m.displayName || m.id }));
+        var nameCol = el("div");
+        nameCol.appendChild(el("strong", { text: m.displayName || m.id }));
+        if (hasPP) {
+          nameCol.appendChild(
+            el("div", {
+              className: "muted",
+              style: { fontSize: "0.78rem", marginTop: "0.1rem" },
+              text:
+                "พร้อมเพย์ " +
+                AomPromptPay.maskId(AomPromptPay.memberPromptPay(m)) +
+                " · " +
+                AomPromptPay.kindLabel(AomPromptPay.detectKind(AomPromptPay.memberPromptPay(m))),
+            })
+          );
+        } else if (bal > 0) {
+          nameCol.appendChild(
+            el("div", {
+              className: "muted",
+              style: { fontSize: "0.78rem", marginTop: "0.1rem" },
+              text: "ยังไม่มีพร้อมเพย์ — ตั้งในแท็บสมาชิก",
+            })
+          );
+        }
+        left.appendChild(nameCol);
         head.appendChild(left);
         head.appendChild(el("span", { className: statusClass, text: statusText }));
         row.appendChild(head);
 
         var stats = el("div", { className: "stat-row" });
         [
-          ["กิน", AomMoney.formatMoney(owed), "money"],
+          ["ใช้", AomMoney.formatMoney(owed), "money"],
           ["จ่าย", AomMoney.formatMoney(paid), "money"],
           ["สุทธิ", AomMoney.formatSigned(bal), balClass],
         ].forEach(function (triple) {
@@ -173,11 +210,17 @@
     plan.transfers.forEach(function (t, idx) {
       var fromName = AomUI.memberName(session, t.from);
       var toName = AomUI.memberName(session, t.to);
+      var toMember = findMember(session, t.to);
       var amtStr = AomMoney.formatMoney(t.amountMinor);
       var tKey = AomStore.transferKey(t);
       var isDone = AomStore.isTransferMarked
         ? AomStore.isTransferMarked(session, t)
         : !!(session.transferMarks && session.transferMarks[tKey] && session.transferMarks[tKey].done);
+
+      var hasPP =
+        toMember && global.AomPromptPay && AomPromptPay.memberHasPromptPay
+          ? AomPromptPay.memberHasPromptPay(toMember)
+          : false;
 
       var card = el("div", {
         className: "card transfer-card" + (isDone ? " done" : ""),
@@ -226,26 +269,75 @@
       bottom.appendChild(el("div", { className: "money big", text: amtStr }));
 
       var actions = el("div", { className: "btn-row" });
-      var copyBtn = el("button", {
-        type: "button",
-        className: "btn btn-sm",
-        text: "📋 คัดลอก",
-        onClick: function () {
-          if (typeof opts.onCopyOne === "function") opts.onCopyOne(idx);
-        },
-      });
-      var markBtn = el("button", {
-        type: "button",
-        className: "btn btn-sm " + (isDone ? "btn-ghost" : "btn-primary"),
-        text: isDone ? "ยกเลิก" : "✓ โอนแล้ว",
-        onClick: function () {
-          if (typeof opts.onToggleDone === "function") opts.onToggleDone(tKey, !isDone);
-        },
-      });
-      actions.appendChild(copyBtn);
-      actions.appendChild(markBtn);
+
+      if (hasPP) {
+        actions.appendChild(
+          el("button", {
+            type: "button",
+            className: "btn btn-sm btn-primary",
+            text: "📱 พร้อมเพย์",
+            onClick: function () {
+              if (typeof opts.onPromptPay === "function") {
+                opts.onPromptPay(t, toMember);
+              }
+            },
+          })
+        );
+      } else {
+        actions.appendChild(
+          el("button", {
+            type: "button",
+            className: "btn btn-sm btn-ghost",
+            text: "⚙️ ตั้งพร้อมเพย์ผู้รับ",
+            onClick: function () {
+              if (typeof opts.onSetupPromptPay === "function") {
+                opts.onSetupPromptPay(t.to);
+              } else if (typeof opts.onPromptPay === "function") {
+                // fallback: still open setup via session handlers
+                opts.onPromptPay(t, toMember || { id: t.to, displayName: toName });
+              }
+            },
+          })
+        );
+      }
+
+      actions.appendChild(
+        el("button", {
+          type: "button",
+          className: "btn btn-sm",
+          text: "📋 คัดลอก",
+          onClick: function () {
+            if (typeof opts.onCopyOne === "function") opts.onCopyOne(idx);
+          },
+        })
+      );
+      actions.appendChild(
+        el("button", {
+          type: "button",
+          className: "btn btn-sm " + (isDone ? "btn-ghost" : ""),
+          text: isDone ? "ยกเลิก" : "✓ โอนแล้ว",
+          onClick: function () {
+            if (typeof opts.onToggleDone === "function") opts.onToggleDone(tKey, !isDone);
+          },
+        })
+      );
       bottom.appendChild(actions);
       card.appendChild(bottom);
+
+      if (hasPP) {
+        card.appendChild(
+          el("div", {
+            className: "muted",
+            style: { fontSize: "0.78rem", marginTop: "0.45rem" },
+            text:
+              "สแกนพร้อมเพย์จ่ายให้ " +
+              toName +
+              " (" +
+              AomPromptPay.maskId(AomPromptPay.memberPromptPay(toMember)) +
+              ") ยอดตามด้านบน",
+          })
+        );
+      }
 
       transfersBox.appendChild(card);
     });
