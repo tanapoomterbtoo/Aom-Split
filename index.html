@@ -1,83 +1,43 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810c"></script>
+  <script src="js/boot.js?v=20260810d"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Aom Split — หารค่าเหล้าเพื่อน (Who Owes Whom)</title>
+  <title>Aom Split — หารเงิน</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/app.css?v=20260810c" />
+  <link rel="stylesheet" href="css/app.css?v=20260810d" />
 </head>
 <body>
-  <!-- App Header -->
+  <!-- App Header: brand + compact sync status -->
   <header class="app-header">
     <a href="index.html" class="brand">
       <div class="logo">A</div>
       <div>
         <h1>Aom Split</h1>
-        <p class="sub">หารเหล้า</p>
+        <p class="sub">หารเงิน</p>
       </div>
     </a>
     <div class="spacer"></div>
-    <button id="btn-header-new" class="btn btn-primary btn-sm">+ สร้างทริปใหม่</button>
+    <button type="button" id="btn-sync-status" class="save-pill cloud" title="แตะเพื่อซิงก์ตอนนี้">☁️ ซิงก์…</button>
+    <button id="btn-header-new" class="btn btn-primary btn-sm">+ สร้าง</button>
   </header>
 
-  <!-- Main Container -->
   <main class="container">
-    <!-- Hero Banner -->
-    <section class="hero card" style="margin-top: 0.5rem; margin-bottom: 1rem; border-color: rgba(240, 180, 41, 0.25);">
-      <div style="font-size: 2.2rem; margin-bottom: 0.2rem;">🍺</div>
-      <h2 style="margin-top: 0;">Aom Split (หารเหล้า)</h2>
-      <p style="margin-bottom: 0.75rem; color: var(--muted); font-size: 0.95rem;">
-        ใครจ่ายอะไร · ใครกินเท่าไร · ใครโอนใคร
-      </p>
-      <div class="btn-row" style="justify-content: center;">
-        <button id="btn-hero-new" class="btn btn-primary">
-          <span style="font-weight: 700;">+ สร้างทริปใหม่</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- Shared cloud DB status (built-in — no setup) -->
-    <section id="remote-card" class="card remote-card connected">
-      <div class="card-h">
-        <h2 style="margin:0;">☁️ ฐานข้อมูลกลุ่ม</h2>
-        <span id="remote-badge" class="badge ok">พร้อมใช้</span>
-      </div>
-      <p class="muted" style="margin:0 0 0.45rem; font-size:0.85rem;">
-        ซิงก์อัตโนมัติกับกลุ่ม — บันทึกแล้วอัปทันที · ดึงของเพื่อนทุก ~12 วินาที · กลับมาที่แท็บแล้วดึงใหม่
-      </p>
-      <div class="btn-row">
-        <button type="button" id="btn-remote-sync" class="btn btn-sm btn-primary">🔄 ซิงก์ตอนนี้</button>
-      </div>
-      <div id="remote-status" class="remote-status pending">กำลังเปิดซิงก์อัตโนมัติ…</div>
-    </section>
-
-    <!-- Persistence notice + backup -->
-    <div id="save-banner" class="save-banner">
-      <div class="icon">☁️</div>
-      <div class="body">
-        <div class="title">ซิงก์กลุ่ม + เก็บบนเครื่อง</div>
-        <div class="desc" id="save-banner-desc">
-          บันทึกอัตโนมัติทั้งบนเครื่องนี้และฐานข้อมูลกลุ่ม — เพื่อนเปิดแอปเครื่องอื่นจะเห็นทริปชุดเดียวกัน
-        </div>
-        <div class="backup-row">
-          <button type="button" id="btn-export" class="btn btn-sm btn-ghost">⬇️ ส่งออกสำรอง</button>
-          <button type="button" id="btn-import" class="btn btn-sm btn-ghost">⬆️ นำเข้าสำรอง</button>
-          <input type="file" id="input-import" accept="application/json,.json" hidden />
-        </div>
-      </div>
-    </div>
-
-    <!-- Session List Section -->
-    <section>
-      <div class="card-h" style="padding: 0 0.25rem;">
-        <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+    <!-- Trip list only -->
+    <section style="margin-top: 0.75rem;">
+      <div class="card-h" style="padding: 0 0.25rem; margin-bottom: 0.5rem;">
+        <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
           <span>รายการทริปของคุณ</span>
           <span id="session-count-badge" class="badge">0</span>
         </h2>
+        <div class="btn-row" style="gap: 0.35rem;">
+          <button type="button" id="btn-export" class="btn btn-sm btn-ghost" title="ส่งออกสำรอง">⬇️</button>
+          <button type="button" id="btn-import" class="btn btn-sm btn-ghost" title="นำเข้าสำรอง">⬆️</button>
+          <input type="file" id="input-import" accept="application/json,.json" hidden />
+        </div>
       </div>
 
       <div id="session-list">
@@ -90,13 +50,13 @@
   <div id="modal-create" class="modal-backdrop">
     <div class="modal">
       <div class="card-h">
-        <h3>🍻 สร้างทริปใหม่</h3>
+        <h3>สร้างทริปใหม่</h3>
         <button type="button" id="btn-modal-close" class="btn btn-ghost btn-sm" style="font-size: 1.2rem; padding: 0.2rem 0.5rem;">✕</button>
       </div>
       <form id="form-create-session" onsubmit="return false;">
         <div class="field">
-          <label for="input-title">ชื่อทริป / ร้าน</label>
-          <input type="text" id="input-title" class="input" placeholder="เช่น คืนนี้สุขุมวิท, ร้านลอยชาย" required />
+          <label for="input-title">ชื่อทริป / กิจกรรม</label>
+          <input type="text" id="input-title" class="input" placeholder="เช่น ทริปทะเล, ร้านอาหาร, เช่าบ้าน" required />
         </div>
         <div class="field">
           <label for="input-members">สมาชิกในกลุ่ม (1 ชื่อต่อบรรทัด)</label>
@@ -113,88 +73,40 @@
     </div>
   </div>
 
-  <!-- Scripts in required order -->
-  <script src="js/money.js?v=20260810c"></script>
-  <script src="js/store.js?v=20260810c"></script>
-  <script src="js/ui.js?v=20260810c"></script>
+  <script src="js/money.js?v=20260810d"></script>
+  <script src="js/store.js?v=20260810d"></script>
+  <script src="js/ui.js?v=20260810d"></script>
   <script>
     (function () {
       const modalEl = document.getElementById("modal-create");
       const titleInput = document.getElementById("input-title");
       const membersInput = document.getElementById("input-members");
 
-      function formatWhen(ts) {
-        if (!ts) return "—";
-        try {
-          return new Date(ts).toLocaleString("th-TH", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          });
-        } catch (e) {
-          return String(ts);
-        }
-      }
-
       function refreshRemoteUi() {
-        const card = document.getElementById("remote-card");
-        const badge = document.getElementById("remote-badge");
-        const statusEl = document.getElementById("remote-status");
+        const pill = document.getElementById("btn-sync-status");
+        if (!pill) return;
         const st = AomStore.getRemoteStatus();
         const on = AomStore.isRemoteEnabled();
 
-        if (card) {
-          card.classList.toggle("connected", on && st.ok !== false);
-        }
-        if (badge) {
-          if (!on) {
-            badge.textContent = "เฉพาะเครื่อง";
-            badge.className = "badge";
-          } else if (st.ok === false) {
-            badge.textContent = "ออฟไลน์";
-            badge.className = "badge warn";
-          } else if (st.ok === null) {
-            badge.textContent = "กำลังซิงก์";
-            badge.className = "badge warn";
-          } else {
-            badge.textContent = "พร้อมใช้";
-            badge.className = "badge ok";
-          }
-        }
-        if (statusEl) {
-          statusEl.className = "remote-status";
-          if (!on) {
-            statusEl.textContent = "โหมดเฉพาะเครื่อง — ไม่ซิงก์กลุ่ม";
-          } else if (st.ok === false) {
-            statusEl.classList.add("err");
-            statusEl.textContent = st.message || "เชื่อมฐานข้อมูลกลุ่มไม่สำเร็จ (ลองกดซิงก์อีกครั้ง)";
-          } else if (st.ok === null) {
-            statusEl.classList.add("pending");
-            statusEl.textContent = st.message || "กำลังซิงก์…";
-          } else {
-            statusEl.classList.add("ok");
-            statusEl.textContent = st.message || "ซิงก์กับกลุ่มแล้ว — เพื่อนเห็นทริปชุดเดียวกัน";
-          }
-        }
-      }
-
-      function refreshSaveBanner() {
-        const banner = document.getElementById("save-banner");
-        const desc = document.getElementById("save-banner-desc");
-        if (!banner || !desc) return;
-        const info = AomStore.storageInfo();
-        if (!info.available) {
-          banner.classList.add("warn");
-          desc.textContent =
-            "เบราว์เซอร์นี้บันทึกไม่ได้ (อาจเป็นโหมดส่วนตัว) — ข้อมูลจะหายเมื่อปิดแท็บ";
+        pill.classList.remove("cloud", "cloud-err");
+        if (!on) {
+          pill.textContent = "💾 เครื่องนี้";
+          pill.title = "โหมดเฉพาะเครื่อง";
           return;
         }
-        banner.classList.remove("warn");
-        desc.innerHTML =
-          "ซิงก์กลุ่มอัตโนมัติ · cache บนเครื่อง " +
-          info.sessionCount +
-          " ทริป · บันทึกล่าสุด " +
-          formatWhen(info.savedAt) +
-          "<br/><span style=\"opacity:0.9\">เพื่อนเปิดแอปเครื่องอื่นจะเห็นทริปชุดเดียวกันหลังซิงก์</span>";
+        if (st.ok === false) {
+          pill.classList.add("cloud-err");
+          pill.textContent = "☁️ ออฟไลน์";
+          pill.title = st.message || "ซิงก์ไม่สำเร็จ — แตะเพื่อลองใหม่";
+        } else if (st.ok === null) {
+          pill.classList.add("cloud");
+          pill.textContent = "☁️ ซิงก์…";
+          pill.title = st.message || "กำลังซิงก์";
+        } else {
+          pill.classList.add("cloud");
+          pill.textContent = "☁️ ซิงก์แล้ว";
+          pill.title = (st.message || "ซิงก์กลุ่มอัตโนมัติ") + " — แตะเพื่อซิงก์ตอนนี้";
+        }
       }
 
       function openModal() {
@@ -210,7 +122,7 @@
 
       function handleCreateSession(e) {
         if (e) e.preventDefault();
-        const title = titleInput.value.trim() || "ทริปกินเหล้า";
+        const title = titleInput.value.trim() || "ทริปใหม่";
         const rawMembers = membersInput.value;
         const names = rawMembers
           .split(/[\n,]/)
@@ -218,11 +130,7 @@
           .filter(Boolean);
 
         if (names.length === 0) {
-          if (typeof AomUI !== "undefined" && AomUI.toast) {
-            AomUI.toast("กรุณาใส่ชื่อสมาชิกอย่างน้อย 1 คน");
-          } else {
-            alert("กรุณาใส่ชื่อสมาชิกอย่างน้อย 1 คน");
-          }
+          AomUI.toast("กรุณาใส่ชื่อสมาชิกอย่างน้อย 1 คน");
           return;
         }
 
@@ -233,9 +141,9 @@
             AomUI.go("session.html", { id: session.id });
           };
           if (AomStore.isRemoteEnabled()) {
-            AomUI.toast("กำลังอัปขึ้น Sheet…");
+            AomUI.toast("กำลังอัปขึ้นกลุ่ม…");
             AomStore.pushSessionToRemote(session).then(go).catch(function (err) {
-              AomUI.toast((err && err.message) || "อัป Sheet ไม่สำเร็จ — เปิดทริปจากเครื่องนี้ก่อน");
+              AomUI.toast((err && err.message) || "อัปไม่สำเร็จ — เปิดทริปจากเครื่องนี้ก่อน");
               go();
             });
           } else {
@@ -250,9 +158,7 @@
         e.stopPropagation();
         if (confirm('คุณต้องการลบทริป "' + title + '" ใช่หรือไม่?')) {
           AomStore.deleteSession(id);
-          if (typeof AomUI !== "undefined" && AomUI.toast) {
-            AomUI.toast("ลบทริปเรียบร้อย");
-          }
+          AomUI.toast("ลบทริปเรียบร้อย");
           render();
         }
       }
@@ -267,9 +173,9 @@
         if (sessions.length === 0) {
           listContainer.innerHTML = `
             <div class="card empty">
-              <div style="font-size:2.5rem; margin-bottom: 0.5rem;">🍻</div>
+              <div style="font-size:2.5rem; margin-bottom: 0.5rem;">💸</div>
               <div style="font-weight:700; font-size:1.1rem; color:var(--text); margin-bottom:0.25rem;">ยังไม่มีทริป</div>
-              <p style="margin-bottom: 1rem;">เริ่มสร้างทริปใหม่ แล้วเพิ่มเพื่อนในกลุ่ม</p>
+              <p style="margin-bottom: 1rem;">สร้างทริปแล้วเพิ่มเพื่อนในกลุ่ม เริ่มหารเงินได้เลย</p>
               <div class="btn-row" style="justify-content:center;">
                 <button class="btn btn-primary btn-sm btn-create-trigger">+ สร้างทริปแรก</button>
               </div>
@@ -294,7 +200,9 @@
             return AomUI.avatar(s, m.id, 24);
           }).join("");
 
-          const extraMemberCount = members.length > 4 ? '<span class="muted" style="font-size:0.75rem; margin-left:0.25rem;">+' + (members.length - 4) + '</span>' : '';
+          const extraMemberCount = members.length > 4
+            ? '<span class="muted" style="font-size:0.75rem; margin-left:0.25rem;">+' + (members.length - 4) + '</span>'
+            : '';
 
           const dateStr = s.date || (s.createdAt ? new Date(s.createdAt).toISOString().slice(0, 10) : "");
 
@@ -303,7 +211,7 @@
               <div class="card-h" style="margin-bottom: 0.4rem;">
                 <div style="min-width:0; flex:1;">
                   <div class="title" style="font-size:1.05rem; font-weight:700; color:var(--text); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
-                    🍺 ${escapeHtml(s.title || "ทริปกินเหล้า")}
+                    ${escapeHtml(s.title || "ทริปใหม่")}
                   </div>
                   <div class="meta" style="font-size:0.82rem; color:var(--muted); margin-top:0.2rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
                     <span>📅 ${escapeHtml(dateStr)}</span>
@@ -333,7 +241,6 @@
 
         listContainer.innerHTML = html;
 
-        // Attach event listeners
         listContainer.querySelectorAll(".session-card").forEach(function (card) {
           card.addEventListener("click", function (e) {
             if (e.target.closest(".btn-delete-session")) return;
@@ -361,12 +268,29 @@
           .replace(/'/g, "&#039;");
       }
 
-      // Event Listeners
+      function doManualSync() {
+        const pill = document.getElementById("btn-sync-status");
+        if (pill) {
+          pill.classList.add("cloud");
+          pill.textContent = "☁️ ซิงก์…";
+        }
+        AomStore.syncNow()
+          .then(function () {
+            AomUI.toast("ซิงก์ครบแล้ว");
+            render();
+            refreshRemoteUi();
+          })
+          .catch(function (err) {
+            AomUI.toast((err && err.message) || "ซิงก์ไม่สำเร็จ");
+            refreshRemoteUi();
+          });
+      }
+
       document.getElementById("btn-header-new").addEventListener("click", openModal);
-      document.getElementById("btn-hero-new").addEventListener("click", openModal);
       document.getElementById("btn-modal-close").addEventListener("click", closeModal);
       document.getElementById("btn-modal-cancel").addEventListener("click", closeModal);
       document.getElementById("form-create-session").addEventListener("submit", handleCreateSession);
+      document.getElementById("btn-sync-status").addEventListener("click", doManualSync);
 
       document.getElementById("btn-export").addEventListener("click", function () {
         try {
@@ -390,7 +314,6 @@
           try {
             const n = AomStore.importData(String(reader.result || ""), "merge");
             AomUI.toast("นำเข้าสำเร็จ · รวม " + n + " ทริป");
-            refreshSaveBanner();
             render();
             if (AomStore.isRemoteEnabled()) {
               AomStore.pushAllToRemote().catch(function () {});
@@ -405,28 +328,10 @@
         reader.readAsText(file, "utf-8");
       });
 
-      document.getElementById("btn-remote-sync").addEventListener("click", function () {
-        AomUI.toast("กำลังซิงก์…");
-        AomStore.syncNow()
-          .then(function () {
-            AomUI.toast("ซิงก์ครบแล้ว");
-            render();
-            refreshSaveBanner();
-            refreshRemoteUi();
-          })
-          .catch(function (err) {
-            AomUI.toast((err && err.message) || "ซิงก์ไม่สำเร็จ");
-            refreshRemoteUi();
-          });
-      });
-
       modalEl.addEventListener("click", function (e) {
         if (e.target === modalEl) closeModal();
       });
 
-      window.addEventListener("aom-split-saved", function () {
-        refreshSaveBanner();
-      });
       window.addEventListener("aom-split-remote", function () {
         refreshRemoteUi();
       });
@@ -434,20 +339,16 @@
         refreshRemoteUi();
         if (ev && ev.detail && ev.detail.changed) {
           render();
-          refreshSaveBanner();
         }
       });
 
-      // ซิงก์ครบตอนเปิด + เปิด auto-pull รอบ ๆ
       refreshRemoteUi();
-      refreshSaveBanner();
       render();
       AomStore.startAutoSync();
 
-      AomStore.syncNow()
+      AomStore.syncNow({ quiet: true })
         .then(function () {
           render();
-          refreshSaveBanner();
           refreshRemoteUi();
         })
         .catch(function () {

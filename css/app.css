@@ -419,7 +419,12 @@ label {
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
   white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
 }
+button.save-pill:hover { filter: brightness(1.08); }
+button.save-pill:active { transform: translateY(1px); }
 .save-pill.flash {
   animation: saveflash 0.8s ease;
 }

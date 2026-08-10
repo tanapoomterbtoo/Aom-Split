@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810c"></script>
+  <script src="js/boot.js?v=20260810d"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260810c">
+  <link rel="stylesheet" href="css/app.css?v=20260810d">
   <style>
     .session-title-input {
       background: transparent;
@@ -319,7 +319,7 @@
         <!-- Title -->
         <div class="field">
           <label for="exp-title">ชื่อรายการ *</label>
-          <input type="text" id="exp-title" class="input" placeholder="เช่น เบียร์ถัง, วิสกี้ช็อต, ไก่ทอด" required autocomplete="off" />
+          <input type="text" id="exp-title" class="input" placeholder="เช่น ค่าอาหาร, ค่าที่พัก, ค่าแท็กซี่" required autocomplete="off" />
         </div>
 
         <!-- Amount & PaidBy in row -->
@@ -377,10 +377,10 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260810c"></script>
-  <script src="js/store.js?v=20260810c"></script>
-  <script src="js/ui.js?v=20260810c"></script>
-  <script src="js/summary-view.js?v=20260810c"></script>
+  <script src="js/money.js?v=20260810d"></script>
+  <script src="js/store.js?v=20260810d"></script>
+  <script src="js/ui.js?v=20260810d"></script>
+  <script src="js/summary-view.js?v=20260810d"></script>
 
   <script>
     // App State
@@ -499,7 +499,7 @@
           }
           currentSession = fresh;
           if (titleInputEl && document.activeElement !== titleInputEl) {
-            titleInputEl.value = currentSession.title || 'ทริปกินเหล้า';
+            titleInputEl.value = currentSession.title || 'ทริปใหม่';
           }
           var dateBadgeEl = document.getElementById('session-date-badge');
           if (dateBadgeEl) dateBadgeEl.textContent = currentSession.date || '';
@@ -508,11 +508,11 @@
 
         // Setup Session Title Listener (auto-save on change + debounce while typing)
         const titleInput = document.getElementById('session-title-input');
-        titleInput.value = currentSession.title || 'ทริปกินเหล้า';
+        titleInput.value = currentSession.title || 'ทริปใหม่';
         let titleTimer = null;
         function saveTitle() {
           const val = titleInput.value.trim();
-          currentSession.title = val || 'ทริปกินเหล้า';
+          currentSession.title = val || 'ทริปใหม่';
           try {
             AomStore.upsertSession(currentSession);
           } catch (err) {
@@ -767,7 +767,7 @@
       if (!expenses.length) {
         container.innerHTML = `
           <div class="card empty">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🍺</div>
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💸</div>
             <div style="font-weight: 700; font-size: 1.1rem; color: var(--text);">ยังไม่มีรายการจ่าย</div>
             <div style="margin-top: 0.38rem;">กดปุ่ม <strong>"+ เพิ่มรายการ"</strong> ด้านล่างเพื่อเพิ่มรายการแรก</div>
           </div>

@@ -191,7 +191,7 @@
     const colors = ["#c9a227", "#3498db", "#e67e22", "#2ecc71", "#9b59b6", "#e74c3c", "#1abc9c"];
     const session = {
       id: uid("ses"),
-      title: title || "ทริปกินเหล้า",
+      title: title || "ทริปใหม่",
       date: new Date().toISOString().slice(0, 10),
       currency: "THB",
       status: "open",
