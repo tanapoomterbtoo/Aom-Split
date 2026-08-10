@@ -1,9 +1,10 @@
 /**
- * Aom Split — summary / transfers view (DOM-only, no brittle HTML strings)
- * Build: 20260810e
+ * Aom Split — summary / transfers view (DOM-only)
+ * Build: 20260810f
+ * Payment verify: pending → claimed (payer) → confirmed (receiver) | rejected
  */
 (function (global) {
-  var BUILD = "20260810e";
+  var BUILD = "20260810f";
 
   function el(tag, props, children) {
     var node = document.createElement(tag);
@@ -53,17 +54,47 @@
     });
   }
 
+  function formatWhen(ts) {
+    if (!ts) return "";
+    try {
+      return new Date(ts).toLocaleString("th-TH", {
+        dateStyle: "short",
+        timeStyle: "short",
+      });
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function statusBadge(status) {
+    if (status === "confirmed") {
+      return el("span", { className: "badge ok", text: "✓ ยืนยันแล้ว" });
+    }
+    if (status === "claimed") {
+      return el("span", { className: "badge warn", text: "รอผู้รับตรวจ" });
+    }
+    if (status === "rejected") {
+      return el("span", {
+        className: "badge",
+        style: {
+          color: "var(--bad)",
+          borderColor: "rgba(255,107,107,0.4)",
+        },
+        text: "✗ ยังไม่ผ่าน",
+      });
+    }
+    return el("span", { className: "badge", text: "รอโอน" });
+  }
+
   /**
    * @param {object} opts
-   * @param {object} opts.session
-   * @param {HTMLElement} opts.membersBox
-   * @param {HTMLElement} opts.transfersBox
-   * @param {HTMLElement} [opts.badgeEl]
-   * @param {HTMLElement} [opts.versionEl]
-   * @param {function} opts.onToggleDone function(key, nextDone)
-   * @param {function} opts.onCopyOne function(idx)
-   * @param {function} [opts.onPromptPay] function(transfer, toMember)
-   * @param {function} [opts.onSetupPromptPay] function(memberId)
+   * @param {function} [opts.onClaim] (transfer, mark)
+   * @param {function} [opts.onConfirm] (transfer, mark)
+   * @param {function} [opts.onReject] (transfer, mark)
+   * @param {function} [opts.onClear] (transfer, mark)
+   * @param {function} [opts.onViewSlip] (transfer, mark)
+   * @param {function} [opts.onPromptPay]
+   * @param {function} [opts.onSetupPromptPay]
    */
   function render(opts) {
     var session = opts.session;
@@ -101,7 +132,7 @@
       );
     }
 
-    // Members
+    // Members balances
     clear(membersBox);
     var members = session.members || [];
     if (!members.length) {
@@ -194,7 +225,7 @@
       });
     }
 
-    // Transfers
+    // Transfers + payment verify
     clear(transfersBox);
     if (!plan.transfers || !plan.transfers.length) {
       var empty = el("div", { className: "card empty" });
@@ -207,15 +238,27 @@
       return plan;
     }
 
+    // legend
+    transfersBox.appendChild(
+      el("div", {
+        className: "muted",
+        style: { fontSize: "0.8rem", marginBottom: "0.65rem", lineHeight: "1.4" },
+        text:
+          "สถานะโอน: ผู้จ่ายแจ้งโอน → ผู้รับกดยืนยันเมื่อเงินเข้าจริง (แอปไม่เชื่อมธนาคารโดยตรง)",
+      })
+    );
+
     plan.transfers.forEach(function (t, idx) {
       var fromName = AomUI.memberName(session, t.from);
       var toName = AomUI.memberName(session, t.to);
       var toMember = findMember(session, t.to);
       var amtStr = AomMoney.formatMoney(t.amountMinor);
       var tKey = AomStore.transferKey(t);
-      var isDone = AomStore.isTransferMarked
-        ? AomStore.isTransferMarked(session, t)
-        : !!(session.transferMarks && session.transferMarks[tKey] && session.transferMarks[tKey].done);
+      var mark = AomStore.getTransferMark
+        ? AomStore.getTransferMark(session, t)
+        : { status: "pending", done: false };
+      var status = mark.status || "pending";
+      var isDone = status === "confirmed";
 
       var hasPP =
         toMember && global.AomPromptPay && AomPromptPay.memberHasPromptPay
@@ -223,7 +266,11 @@
           : false;
 
       var card = el("div", {
-        className: "card transfer-card" + (isDone ? " done" : ""),
+        className:
+          "card transfer-card" +
+          (isDone ? " done" : "") +
+          (status === "claimed" ? " transfer-claimed" : "") +
+          (status === "rejected" ? " transfer-rejected" : ""),
         style: { marginBottom: "0.65rem" },
       });
 
@@ -251,9 +298,7 @@
       who.appendChild(avatarNode(session, t.to, 28));
       who.appendChild(el("span", { text: toName }));
       top.appendChild(who);
-      if (isDone) {
-        top.appendChild(el("span", { className: "badge ok", text: "✓ โอนแล้ว" }));
-      }
+      top.appendChild(statusBadge(status));
       card.appendChild(top);
 
       var bottom = el("div", {
@@ -270,32 +315,75 @@
 
       var actions = el("div", { className: "btn-row" });
 
-      if (hasPP) {
+      if (!isDone && hasPP) {
         actions.appendChild(
           el("button", {
             type: "button",
             className: "btn btn-sm btn-primary",
             text: "📱 พร้อมเพย์",
             onClick: function () {
-              if (typeof opts.onPromptPay === "function") {
-                opts.onPromptPay(t, toMember);
-              }
+              if (typeof opts.onPromptPay === "function") opts.onPromptPay(t, toMember);
             },
           })
         );
-      } else {
+      } else if (!isDone && !hasPP) {
         actions.appendChild(
           el("button", {
             type: "button",
             className: "btn btn-sm btn-ghost",
             text: "⚙️ ตั้งพร้อมเพย์ผู้รับ",
             onClick: function () {
-              if (typeof opts.onSetupPromptPay === "function") {
-                opts.onSetupPromptPay(t.to);
-              } else if (typeof opts.onPromptPay === "function") {
-                // fallback: still open setup via session handlers
-                opts.onPromptPay(t, toMember || { id: t.to, displayName: toName });
-              }
+              if (typeof opts.onSetupPromptPay === "function") opts.onSetupPromptPay(t.to);
+            },
+          })
+        );
+      }
+
+      if (status === "pending" || status === "rejected") {
+        actions.appendChild(
+          el("button", {
+            type: "button",
+            className: "btn btn-sm btn-primary",
+            text: status === "rejected" ? "แจ้งโอนอีกครั้ง" : "แจ้งว่าโอนแล้ว",
+            onClick: function () {
+              if (typeof opts.onClaim === "function") opts.onClaim(t, mark);
+            },
+          })
+        );
+      }
+
+      if (status === "claimed") {
+        actions.appendChild(
+          el("button", {
+            type: "button",
+            className: "btn btn-sm btn-primary",
+            text: "✓ ผู้รับยืนยัน",
+            onClick: function () {
+              if (typeof opts.onConfirm === "function") opts.onConfirm(t, mark);
+            },
+          })
+        );
+        actions.appendChild(
+          el("button", {
+            type: "button",
+            className: "btn btn-sm btn-ghost",
+            style: { color: "var(--bad)" },
+            text: "ยังไม่ได้รับ",
+            onClick: function () {
+              if (typeof opts.onReject === "function") opts.onReject(t, mark);
+            },
+          })
+        );
+      }
+
+      if (mark.slipDataUrl) {
+        actions.appendChild(
+          el("button", {
+            type: "button",
+            className: "btn btn-sm",
+            text: "🖼 สลิป",
+            onClick: function () {
+              if (typeof opts.onViewSlip === "function") opts.onViewSlip(t, mark);
             },
           })
         );
@@ -311,20 +399,45 @@
           },
         })
       );
-      actions.appendChild(
-        el("button", {
-          type: "button",
-          className: "btn btn-sm " + (isDone ? "btn-ghost" : ""),
-          text: isDone ? "ยกเลิก" : "✓ โอนแล้ว",
-          onClick: function () {
-            if (typeof opts.onToggleDone === "function") opts.onToggleDone(tKey, !isDone);
-          },
-        })
-      );
+
+      if (status !== "pending") {
+        actions.appendChild(
+          el("button", {
+            type: "button",
+            className: "btn btn-sm btn-ghost",
+            text: "รีเซ็ต",
+            onClick: function () {
+              if (typeof opts.onClear === "function") opts.onClear(t, mark);
+            },
+          })
+        );
+      }
+
       bottom.appendChild(actions);
       card.appendChild(bottom);
 
-      if (hasPP) {
+      // detail line
+      var detailParts = [];
+      if (mark.ref) detailParts.push("รหัสอ้างอิง " + mark.ref);
+      if (status === "claimed" && mark.claimedAt) {
+        detailParts.push("แจ้งโอน " + formatWhen(mark.claimedAt));
+      }
+      if (status === "confirmed" && mark.confirmedAt) {
+        detailParts.push("ยืนยัน " + formatWhen(mark.confirmedAt));
+      }
+      if (status === "rejected" && mark.rejectNote) {
+        detailParts.push("เหตุผล: " + mark.rejectNote);
+      }
+      if (mark.note) detailParts.push(mark.note);
+      if (detailParts.length) {
+        card.appendChild(
+          el("div", {
+            className: "muted",
+            style: { fontSize: "0.78rem", marginTop: "0.45rem", lineHeight: "1.4" },
+            text: detailParts.join(" · "),
+          })
+        );
+      } else if (hasPP && !isDone) {
         card.appendChild(
           el("div", {
             className: "muted",
@@ -332,9 +445,7 @@
             text:
               "สแกนพร้อมเพย์จ่ายให้ " +
               toName +
-              " (" +
-              AomPromptPay.maskId(AomPromptPay.memberPromptPay(toMember)) +
-              ") ยอดตามด้านบน",
+              " แล้วกด «แจ้งว่าโอนแล้ว» ให้ผู้รับตรวจ",
           })
         );
       }

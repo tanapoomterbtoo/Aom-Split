@@ -210,17 +210,6 @@
     return upsertSession(session);
   }
 
-  function markTransfer(sessionId, key, done) {
-    const s = getSession(sessionId);
-    if (!s) return null;
-    s.transferMarks = s.transferMarks || {};
-    s.transferMarks[key] = {
-      done: !!done,
-      at: Date.now(),
-    };
-    return upsertSession(s);
-  }
-
   function transferKey(t) {
     return String(t.from) + "__" + String(t.to) + "__" + String(t.amountMinor);
   }
@@ -231,13 +220,172 @@
     return [modern, legacy];
   }
 
-  function isTransferMarked(session, t) {
+  function getRawTransferMark(session, tOrKey) {
     var marks = (session && session.transferMarks) || {};
-    var keys = transferKeyAliases(t);
-    for (var i = 0; i < keys.length; i++) {
-      if (marks[keys[i]] && marks[keys[i]].done) return true;
+    if (typeof tOrKey === "string") {
+      return marks[tOrKey] || null;
     }
-    return false;
+    var keys = transferKeyAliases(tOrKey);
+    for (var i = 0; i < keys.length; i++) {
+      if (marks[keys[i]]) return marks[keys[i]];
+    }
+    return null;
+  }
+
+  /**
+   * Normalize mark → status
+   * pending | claimed | confirmed | rejected
+   * Legacy: { done: true } → confirmed
+   */
+  function normalizeTransferMark(raw) {
+    if (!raw) {
+      return {
+        status: "pending",
+        done: false,
+        ref: "",
+        note: "",
+        slipDataUrl: "",
+        claimedAt: null,
+        confirmedAt: null,
+        rejectedAt: null,
+      };
+    }
+    var status = raw.status;
+    if (!status) {
+      status = raw.done ? "confirmed" : "pending";
+    }
+    if (status === "done") status = "confirmed";
+    return {
+      status: status,
+      done: status === "confirmed",
+      ref: raw.ref || "",
+      note: raw.note || "",
+      slipDataUrl: raw.slipDataUrl || "",
+      claimedAt: raw.claimedAt || raw.at || null,
+      claimedBy: raw.claimedBy || "",
+      confirmedAt: raw.confirmedAt || (status === "confirmed" ? raw.at || null : null),
+      confirmedBy: raw.confirmedBy || "",
+      rejectedAt: raw.rejectedAt || null,
+      rejectNote: raw.rejectNote || "",
+      at: raw.at || raw.claimedAt || raw.confirmedAt || null,
+    };
+  }
+
+  function getTransferMark(session, t) {
+    return normalizeTransferMark(getRawTransferMark(session, t));
+  }
+
+  function getTransferStatus(session, t) {
+    return getTransferMark(session, t).status;
+  }
+
+  /** ยืนยันครบแล้ว (ผู้รับคอนเฟิร์ม) — ใช้แทน done เดิม */
+  function isTransferMarked(session, t) {
+    return getTransferStatus(session, t) === "confirmed";
+  }
+
+  function makePaymentRef() {
+    var s = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    return "AOM-" + s.slice(0, 4) + (Date.now().toString(36).toUpperCase().slice(-3));
+  }
+
+  function writeTransferMark(sessionId, key, mark) {
+    const s = getSession(sessionId);
+    if (!s) return null;
+    s.transferMarks = s.transferMarks || {};
+    // drop empty slip to save space if cleared
+    s.transferMarks[key] = mark;
+    return upsertSession(s);
+  }
+
+  /** เดิม: ติ๊ก done ตรง ๆ — ยังรองรับ, map เป็น confirmed/pending */
+  function markTransfer(sessionId, key, done) {
+    if (!done) {
+      return clearTransferPayment(sessionId, key);
+    }
+    return confirmTransferPayment(sessionId, key, { confirmedBy: "manual" });
+  }
+
+  /**
+   * ผู้จ่ายแจ้งว่าโอนแล้ว (รอผู้รับยืนยัน)
+   * @param {{ note?: string, slipDataUrl?: string, claimedBy?: string, ref?: string }} [meta]
+   */
+  function claimTransferPayment(sessionId, key, meta) {
+    meta = meta || {};
+    const s = getSession(sessionId);
+    if (!s) return null;
+    const prev = normalizeTransferMark((s.transferMarks || {})[key]);
+    const mark = {
+      status: "claimed",
+      done: false,
+      ref: meta.ref || prev.ref || makePaymentRef(),
+      note: meta.note != null ? String(meta.note) : prev.note || "",
+      slipDataUrl:
+        meta.slipDataUrl != null ? meta.slipDataUrl : prev.slipDataUrl || "",
+      claimedAt: Date.now(),
+      claimedBy: meta.claimedBy || prev.claimedBy || "",
+      confirmedAt: null,
+      confirmedBy: "",
+      rejectedAt: null,
+      rejectNote: "",
+      at: Date.now(),
+    };
+    return writeTransferMark(sessionId, key, mark);
+  }
+
+  /** ผู้รับยืนยันว่าได้รับเงินจริง */
+  function confirmTransferPayment(sessionId, key, meta) {
+    meta = meta || {};
+    const s = getSession(sessionId);
+    if (!s) return null;
+    const prev = normalizeTransferMark((s.transferMarks || {})[key]);
+    const mark = {
+      status: "confirmed",
+      done: true,
+      ref: prev.ref || makePaymentRef(),
+      note: prev.note || "",
+      slipDataUrl: prev.slipDataUrl || "",
+      claimedAt: prev.claimedAt || Date.now(),
+      claimedBy: prev.claimedBy || "",
+      confirmedAt: Date.now(),
+      confirmedBy: meta.confirmedBy || "",
+      rejectedAt: null,
+      rejectNote: "",
+      at: Date.now(),
+    };
+    return writeTransferMark(sessionId, key, mark);
+  }
+
+  /** ผู้รับปฏิเสธ — ยังไม่ได้รับ / สลิปไม่ตรง */
+  function rejectTransferPayment(sessionId, key, meta) {
+    meta = meta || {};
+    const s = getSession(sessionId);
+    if (!s) return null;
+    const prev = normalizeTransferMark((s.transferMarks || {})[key]);
+    const mark = {
+      status: "rejected",
+      done: false,
+      ref: prev.ref || "",
+      note: prev.note || "",
+      slipDataUrl: prev.slipDataUrl || "",
+      claimedAt: prev.claimedAt || null,
+      claimedBy: prev.claimedBy || "",
+      confirmedAt: null,
+      confirmedBy: "",
+      rejectedAt: Date.now(),
+      rejectNote: meta.note || meta.rejectNote || "",
+      at: Date.now(),
+    };
+    return writeTransferMark(sessionId, key, mark);
+  }
+
+  function clearTransferPayment(sessionId, key) {
+    const s = getSession(sessionId);
+    if (!s) return null;
+    s.transferMarks = s.transferMarks || {};
+    delete s.transferMarks[key];
+    // also clear legacy aliases if present later — key is modern
+    return upsertSession(s);
   }
 
   function exportData() {
@@ -819,6 +967,13 @@
     transferKey: transferKey,
     transferKeyAliases: transferKeyAliases,
     isTransferMarked: isTransferMarked,
+    getTransferMark: getTransferMark,
+    getTransferStatus: getTransferStatus,
+    claimTransferPayment: claimTransferPayment,
+    confirmTransferPayment: confirmTransferPayment,
+    rejectTransferPayment: rejectTransferPayment,
+    clearTransferPayment: clearTransferPayment,
+    makePaymentRef: makePaymentRef,
     isStorageAvailable: isStorageAvailable,
     exportData: exportData,
     exportJsonString: exportJsonString,
