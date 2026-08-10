@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810f"></script>
+  <script src="js/boot.js?v=20260810g"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260810f">
+  <link rel="stylesheet" href="css/app.css?v=20260810g">
   <style>
     .session-title-input {
       background: transparent;
@@ -219,26 +219,6 @@
       text-align: center;
       line-height: 1.4;
     }
-    .transfer-claimed {
-      border-color: rgba(240, 180, 41, 0.4);
-    }
-    .transfer-rejected {
-      border-color: rgba(255, 107, 107, 0.4);
-    }
-    .slip-preview {
-      max-width: 100%;
-      max-height: 160px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      margin-top: 0.4rem;
-      display: none;
-    }
-    .slip-preview.show { display: block; }
-    #slip-view-img {
-      max-width: 100%;
-      border-radius: 12px;
-      background: #fff;
-    }
   </style>
 </head>
 <body>
@@ -413,64 +393,12 @@
           เปิดแอปธนาคาร → สแกน QR นี้<br/>
           ยอดถูกระบุไว้แล้วตามสรุปโอน
         </p>
-        <div id="pp-pay-ref" class="muted" style="font-size:0.8rem; text-align:center;"></div>
         <div class="btn-row" style="width:100%; flex-direction:column;">
-          <button type="button" class="btn btn-primary btn-block" onclick="claimFromPromptPay()">แจ้งว่าโอนแล้ว</button>
+          <button type="button" class="btn btn-primary btn-block" onclick="markCurrentPromptPayDone()">✓ โอนแล้ว</button>
           <button type="button" class="btn btn-block" onclick="copyPromptPayPayload()">📋 คัดลอก payload</button>
           <button type="button" class="btn btn-ghost btn-block" onclick="closePromptPayPay()">ปิด</button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- แจ้งโอนแล้ว + แนบสลิป (รอผู้รับยืนยัน) -->
-  <div id="pay-claim-modal" class="modal-backdrop" onclick="if(event.target===this)closePayClaim()">
-    <div class="modal" onclick="event.stopPropagation()">
-      <div class="card-h">
-        <h3>แจ้งว่าโอนแล้ว</h3>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closePayClaim()">✕</button>
-      </div>
-      <p class="muted" style="margin:0 0 0.65rem; font-size:0.85rem;">
-        ระบบ<strong>ไม่เชื่อมธนาคารอัตโนมัติ</strong> — ผู้จ่ายแจ้งโอน แล้ว<strong>ผู้รับกดยืนยัน</strong>เมื่อเงินเข้าจริง
-        (แนบสลิปช่วยตรวจได้)
-      </p>
-      <div style="margin-bottom:0.65rem;">
-        <div class="muted" style="font-size:0.8rem;">รายการ</div>
-        <div id="pay-claim-who" style="font-weight:700;">—</div>
-        <div id="pay-claim-amount" class="money" style="font-size:1.15rem; margin-top:0.2rem;">—</div>
-      </div>
-      <div class="field">
-        <label for="pay-claim-ref">รหัสอ้างอิง (ใส่ในหมายเหตุโอนได้)</label>
-        <div style="display:flex; gap:0.4rem;">
-          <input type="text" id="pay-claim-ref" class="input" readonly />
-          <button type="button" class="btn btn-sm" onclick="copyPayClaimRef()">คัดลอก</button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="pay-claim-note">หมายเหตุ (ถ้ามี)</label>
-        <input type="text" id="pay-claim-note" class="input" placeholder="เช่น โอนเวลา 21:05 จากกสิกร" autocomplete="off" />
-      </div>
-      <div class="field">
-        <label for="pay-claim-slip">แนบสลิป (ไม่บังคับ)</label>
-        <input type="file" id="pay-claim-slip" accept="image/*" capture="environment" />
-        <img id="pay-claim-slip-preview" class="slip-preview" alt="สลิป" />
-      </div>
-      <div class="btn-row" style="flex-direction:column; margin-top:0.5rem;">
-        <button type="button" class="btn btn-primary btn-block" onclick="submitPayClaim()">ส่งให้ผู้รับตรวจ</button>
-        <button type="button" class="btn btn-ghost btn-block" onclick="closePayClaim()">ยกเลิก</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ดูสลิป -->
-  <div id="slip-view-modal" class="modal-backdrop" onclick="if(event.target===this)closeSlipView()">
-    <div class="modal" onclick="event.stopPropagation()">
-      <div class="card-h">
-        <h3>สลิปโอน</h3>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeSlipView()">✕</button>
-      </div>
-      <img id="slip-view-img" alt="สลิปโอน" />
-      <button type="button" class="btn btn-block" style="margin-top:0.75rem;" onclick="closeSlipView()">ปิด</button>
     </div>
   </div>
 
@@ -544,12 +472,12 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260810f"></script>
-  <script src="js/store.js?v=20260810f"></script>
-  <script src="js/ui.js?v=20260810f"></script>
-  <script src="js/promptpay.js?v=20260810f"></script>
-  <script src="js/qrcode.min.js?v=20260810f"></script>
-  <script src="js/summary-view.js?v=20260810f"></script>
+  <script src="js/money.js?v=20260810g"></script>
+  <script src="js/store.js?v=20260810g"></script>
+  <script src="js/ui.js?v=20260810g"></script>
+  <script src="js/promptpay.js?v=20260810g"></script>
+  <script src="js/qrcode.min.js?v=20260810g"></script>
+  <script src="js/summary-view.js?v=20260810g"></script>
 
   <script>
     // App State
@@ -709,7 +637,6 @@
 
         // เปิดซิงก์อัตโนมัติขณะอยู่ในหน้าทริป
         AomStore.startAutoSync();
-        wirePayClaimSlipInput();
 
         // Deep link: session.html?id=...&tab=summary
         const initialTab = AomUI.getQuery('tab');
@@ -855,11 +782,9 @@
         onCopyOne: function (idx) {
           copyOneTransfer(idx);
         },
-        onClaim: openPayClaim,
-        onConfirm: confirmPayReceived,
-        onReject: rejectPayReceived,
-        onClear: clearPayStatus,
-        onViewSlip: viewPaySlip,
+        onToggleDone: function (key, nextDone) {
+          toggleTransferDone(key, nextDone);
+        },
         onPromptPay: openPromptPayPay,
         onSetupPromptPay: openPromptPaySetup,
       });
@@ -951,14 +876,6 @@
         ' ' +
         AomPromptPay.maskId(AomPromptPay.memberPromptPay(toMember));
       document.getElementById('pp-pay-amount').textContent = AomMoney.formatMoney(transfer.amountMinor);
-      var existing = AomStore.getTransferMark(currentSession, transfer);
-      var refEl = document.getElementById('pp-pay-ref');
-      if (refEl) {
-        var ref = existing.ref || AomStore.makePaymentRef();
-        ppPayContext.ref = ref;
-        refEl.textContent = 'แนะนำใส่หมายเหตุโอน: ' + ref;
-      }
-
       var qrBox = document.getElementById('pp-pay-qr');
       qrBox.innerHTML = '';
       if (typeof QRCode === 'undefined') {
@@ -990,200 +907,10 @@
       AomUI.copyText(ppPayContext.payload);
     }
 
-    function claimFromPromptPay() {
-      if (!ppPayContext || !ppPayContext.transfer) return;
-      var t = ppPayContext.transfer;
-      var mark = AomStore.getTransferMark(currentSession, t) || {};
-      if (ppPayContext.ref) mark.ref = ppPayContext.ref;
+    function markCurrentPromptPayDone() {
+      if (!ppPayContext || !ppPayContext.key) return;
+      toggleTransferDone(ppPayContext.key, true);
       closePromptPayPay();
-      openPayClaim(t, mark);
-    }
-
-    /* ───── ตรวจสถานะโอน (สองฝ่าย) ───── */
-    var payClaimCtx = null; // { transfer, key, slipDataUrl }
-    var payClaimSlipDataUrl = '';
-
-    function openPayClaim(transfer, mark) {
-      if (!transfer) return;
-      payClaimCtx = {
-        transfer: transfer,
-        key: AomStore.transferKey(transfer),
-      };
-      payClaimSlipDataUrl = '';
-      var fromName = AomUI.memberName(currentSession, transfer.from);
-      var toName = AomUI.memberName(currentSession, transfer.to);
-      document.getElementById('pay-claim-who').textContent = fromName + ' → ' + toName;
-      document.getElementById('pay-claim-amount').textContent = AomMoney.formatMoney(transfer.amountMinor);
-      var ref = (mark && mark.ref) || AomStore.makePaymentRef();
-      document.getElementById('pay-claim-ref').value = ref;
-      document.getElementById('pay-claim-note').value = (mark && mark.note) || '';
-      var fileInput = document.getElementById('pay-claim-slip');
-      if (fileInput) fileInput.value = '';
-      var prev = document.getElementById('pay-claim-slip-preview');
-      if (prev) {
-        prev.src = '';
-        prev.classList.remove('show');
-      }
-      document.getElementById('pay-claim-modal').classList.add('show');
-    }
-
-    function closePayClaim() {
-      document.getElementById('pay-claim-modal').classList.remove('show');
-      payClaimCtx = null;
-      payClaimSlipDataUrl = '';
-    }
-
-    function copyPayClaimRef() {
-      var ref = document.getElementById('pay-claim-ref').value;
-      if (ref) AomUI.copyText(ref);
-    }
-
-    function compressImageFile(file, maxSide, quality) {
-      maxSide = maxSide || 1280;
-      quality = quality || 0.72;
-      return new Promise(function (resolve, reject) {
-        var reader = new FileReader();
-        reader.onload = function () {
-          var img = new Image();
-          img.onload = function () {
-            var w = img.width;
-            var h = img.height;
-            var scale = Math.min(1, maxSide / Math.max(w, h));
-            var cw = Math.round(w * scale);
-            var ch = Math.round(h * scale);
-            var canvas = document.createElement('canvas');
-            canvas.width = cw;
-            canvas.height = ch;
-            var ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, cw, ch);
-            var dataUrl = canvas.toDataURL('image/jpeg', quality);
-            // cap ~450KB data url
-            if (dataUrl.length > 600000) {
-              dataUrl = canvas.toDataURL('image/jpeg', 0.55);
-            }
-            resolve(dataUrl);
-          };
-          img.onerror = function () {
-            reject(new Error('อ่านรูปไม่สำเร็จ'));
-          };
-          img.src = reader.result;
-        };
-        reader.onerror = function () {
-          reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
-    function wirePayClaimSlipInput() {
-      var fileInput = document.getElementById('pay-claim-slip');
-      if (!fileInput || fileInput._wired) return;
-      fileInput._wired = true;
-      fileInput.addEventListener('change', function () {
-        var file = fileInput.files && fileInput.files[0];
-        if (!file) return;
-        compressImageFile(file)
-          .then(function (dataUrl) {
-            payClaimSlipDataUrl = dataUrl;
-            var prev = document.getElementById('pay-claim-slip-preview');
-            if (prev) {
-              prev.src = dataUrl;
-              prev.classList.add('show');
-            }
-          })
-          .catch(function (err) {
-            AomUI.toast((err && err.message) || 'แนบสลิปไม่สำเร็จ');
-          });
-      });
-    }
-
-    function submitPayClaim() {
-      if (!payClaimCtx) return;
-      var note = document.getElementById('pay-claim-note').value.trim();
-      var ref = document.getElementById('pay-claim-ref').value.trim();
-      var toName = AomUI.memberName(currentSession, payClaimCtx.transfer.to);
-      var fromName = AomUI.memberName(currentSession, payClaimCtx.transfer.from);
-      var key = payClaimCtx.key;
-      try {
-        AomStore.claimTransferPayment(currentSession.id, key, {
-          note: note,
-          ref: ref,
-          slipDataUrl: payClaimSlipDataUrl || '',
-          claimedBy: fromName,
-        });
-        var fresh = AomStore.getSession(currentSession.id);
-        if (fresh) currentSession = fresh;
-        closePayClaim();
-        renderSummary();
-        AomUI.toast('แจ้งโอนแล้ว — รอ ' + toName + ' ยืนยัน');
-      } catch (err) {
-        AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
-      }
-    }
-
-    function confirmPayReceived(transfer) {
-      if (!transfer) return;
-      var toName = AomUI.memberName(currentSession, transfer.to);
-      if (!confirm('ยืนยันว่า "' + toName + '" ได้รับเงิน ' + AomMoney.formatMoney(transfer.amountMinor) + ' แล้ว?')) {
-        return;
-      }
-      try {
-        var key = AomStore.transferKey(transfer);
-        AomStore.confirmTransferPayment(currentSession.id, key, {
-          confirmedBy: toName,
-        });
-        var fresh = AomStore.getSession(currentSession.id);
-        if (fresh) currentSession = fresh;
-        renderSummary();
-        AomUI.toast('ยืนยันรับเงินแล้ว');
-      } catch (err) {
-        AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
-      }
-    }
-
-    function rejectPayReceived(transfer) {
-      if (!transfer) return;
-      var reason = prompt('เหตุผลที่ยังไม่ยืนยัน (เช่น ยังไม่เข้า / ยอดไม่ตรง)', 'ยังไม่เห็นเงินเข้า');
-      if (reason === null) return;
-      try {
-        var key = AomStore.transferKey(transfer);
-        AomStore.rejectTransferPayment(currentSession.id, key, { note: reason });
-        var fresh = AomStore.getSession(currentSession.id);
-        if (fresh) currentSession = fresh;
-        renderSummary();
-        AomUI.toast('บันทึกว่ายังไม่ได้รับ — ให้ผู้จ่ายแจ้งใหม่');
-      } catch (err) {
-        AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
-      }
-    }
-
-    function clearPayStatus(transfer) {
-      if (!transfer) return;
-      if (!confirm('รีเซ็ตสถานะโอนรายการนี้?')) return;
-      try {
-        var key = AomStore.transferKey(transfer);
-        AomStore.clearTransferPayment(currentSession.id, key);
-        var fresh = AomStore.getSession(currentSession.id);
-        if (fresh) currentSession = fresh;
-        renderSummary();
-        AomUI.toast('รีเซ็ตสถานะแล้ว');
-      } catch (err) {
-        AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
-      }
-    }
-
-    function viewPaySlip(transfer, mark) {
-      if (!mark || !mark.slipDataUrl) {
-        AomUI.toast('ไม่มีสลิปแนบ');
-        return;
-      }
-      document.getElementById('slip-view-img').src = mark.slipDataUrl;
-      document.getElementById('slip-view-modal').classList.add('show');
-    }
-
-    function closeSlipView() {
-      document.getElementById('slip-view-modal').classList.remove('show');
-      document.getElementById('slip-view-img').src = '';
     }
 
     function shareSummaryAll() {
@@ -1235,17 +962,12 @@
     }
 
     function toggleTransferDone(key, done) {
-      // legacy helper — ใช้ flow ยืนยันสองฝ่ายแทน
       try {
-        if (done) {
-          AomStore.confirmTransferPayment(currentSession.id, key, { confirmedBy: 'manual' });
-        } else {
-          AomStore.clearTransferPayment(currentSession.id, key);
-        }
+        AomStore.markTransfer(currentSession.id, key, done);
         const fresh = AomStore.getSession(currentSession.id);
         if (fresh) currentSession = fresh;
         renderSummary();
-        AomUI.toast(done ? 'ยืนยันแล้ว' : 'รีเซ็ตสถานะ');
+        AomUI.toast(done ? 'ติ๊กโอนแล้ว' : 'ยกเลิกเครื่องหมาย');
       } catch (err) {
         AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
       }
