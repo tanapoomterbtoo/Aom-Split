@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810g"></script>
+  <script src="js/boot.js?v=20260810h"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
@@ -9,234 +9,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260810g">
-  <style>
-    .session-title-input {
-      background: transparent;
-      border: 1px dashed var(--border);
-      color: var(--text);
-      font-size: 1.15rem;
-      font-weight: 700;
-      padding: 0.3rem 0.5rem;
-      border-radius: 8px;
-      width: 100%;
-      font-family: inherit;
-    }
-    .session-title-input:hover {
-      border-color: var(--accent);
-    }
-    .session-title-input:focus {
-      border-style: solid;
-      border-color: var(--accent);
-      background: var(--bg);
-      outline: none;
-    }
-    .fab {
-      position: fixed;
-      right: 1.25rem;
-      bottom: calc(1.5rem + var(--safe-b));
-      background: linear-gradient(135deg, var(--accent), #d4920f);
-      color: #1a1205;
-      border: none;
-      border-radius: 999px;
-      padding: 0.85rem 1.4rem;
-      font-weight: 700;
-      font-size: 1rem;
-      box-shadow: 0 8px 24px rgba(240, 180, 41, 0.4);
-      cursor: pointer;
-      z-index: 60;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .fab:hover {
-      transform: translateY(-2px) scale(1.03);
-      box-shadow: 0 12px 28px rgba(240, 180, 41, 0.5);
-    }
-    .fab:active {
-      transform: translateY(0) scale(0.98);
-    }
-    .member-item-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .member-item-row:last-child {
-      border-bottom: none;
-    }
-    .member-info {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .member-name {
-      font-weight: 600;
-      font-size: 1rem;
-    }
-    .member-stats {
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    .participant-row-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-      padding: 0.45rem 0;
-      border-bottom: 1px dashed var(--border);
-    }
-    .participant-row-item:last-child {
-      border-bottom: none;
-    }
-    .exact-input {
-      width: 110px;
-      text-align: right;
-    }
-    .summary-bar {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 0.85rem 1rem;
-      margin-bottom: 0.85rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .summary-stat-val {
-      font-family: var(--mono);
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--accent);
-    }
-    .summary-stat-lbl {
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    .color-picker-dot {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      display: inline-block;
-      cursor: pointer;
-      border: 2px solid transparent;
-      transition: transform 0.1s ease;
-    }
-    .color-picker-dot:hover {
-      transform: scale(1.1);
-    }
-    .color-picker-dot.active {
-      border-color: #fff;
-      transform: scale(1.15);
-    }
-    .color-select-row {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      margin-top: 0.4rem;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    .exact-validation-msg {
-      font-size: 0.82rem;
-      margin-top: 0.4rem;
-      font-weight: 600;
-      padding: 0.4rem 0.6rem;
-      border-radius: 8px;
-    }
-    .exact-validation-msg.ok {
-      background: rgba(61, 214, 140, 0.12);
-      color: var(--good);
-      border: 1px solid rgba(61, 214, 140, 0.3);
-    }
-    .exact-validation-msg.error {
-      background: rgba(255, 107, 107, 0.12);
-      color: var(--bad);
-      border: 1px solid rgba(255, 107, 107, 0.3);
-    }
-    .btn-icon {
-      padding: 0.35rem 0.6rem;
-      border-radius: 8px;
-    }
-    .badge-mode {
-      font-size: 0.72rem;
-      padding: 0.15rem 0.45rem;
-      border-radius: 6px;
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      color: var(--muted);
-    }
-    .exp-item-actions {
-      display: flex;
-      gap: 0.35rem;
-      align-items: center;
-    }
-    .split-mode-desc {
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-top: 0.35rem;
-    }
-    .pp-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--info);
-      background: rgba(91, 157, 255, 0.12);
-      border: 1px solid rgba(91, 157, 255, 0.3);
-      border-radius: 999px;
-      padding: 0.12rem 0.45rem;
-      margin-top: 0.2rem;
-    }
-    .pp-qr-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.65rem;
-      padding: 0.5rem 0 0.25rem;
-    }
-    .pp-qr-box {
-      background: #fff;
-      border-radius: 12px;
-      padding: 0.75rem;
-      line-height: 0;
-    }
-    .pp-qr-box img, .pp-qr-box canvas {
-      display: block;
-      width: 220px;
-      height: 220px;
-    }
-    .pp-hint {
-      font-size: 0.82rem;
-      color: var(--muted);
-      text-align: center;
-      line-height: 1.4;
-    }
-  </style>
+  <link rel="stylesheet" href="css/app.css?v=20260810h">
 </head>
 <body>
 
   <!-- App Header -->
   <header class="app-header">
-    <a href="index.html" class="btn btn-ghost btn-sm" title="กลับหน้าแรก" style="padding:0.4rem 0.6rem;">
-      ‹ หน้าแรก
+    <a href="index.html" class="btn btn-ghost btn-sm" title="กลับหน้าแรก">
+      ← กลับ
     </a>
     <div class="spacer"></div>
-    <span id="save-pill" class="save-pill" title="สถานะการบันทึก">💾 บันทึกอัตโนมัติ</span>
+    <span id="save-pill" class="save-pill" title="สถานะการบันทึก">บันทึกอัตโนมัติ</span>
     <div class="sub" id="session-date-badge" style="margin-left:0.35rem;"></div>
   </header>
 
   <main class="container">
     <!-- Session Title Banner -->
-    <div class="card" style="margin-bottom: 0.85rem;">
-      <label for="session-title-input" style="font-size: 0.75rem;">ชื่อทริป / โต๊ะคืนนี้ (กดเพื่อแก้ไข)</label>
+    <div class="card">
+      <label for="session-title-input">ชื่อทริป</label>
       <input type="text" id="session-title-input" class="session-title-input" placeholder="ระบุชื่อทริป..." />
     </div>
 
@@ -249,7 +39,7 @@
         สมาชิก (<span id="tab-count-members">0</span>)
       </button>
       <button type="button" id="tab-btn-summary" onclick="switchTab('summary')">
-        สรุปโอน ⚡
+        สรุปโอน
       </button>
     </nav>
 
@@ -257,7 +47,7 @@
     <section id="section-expenses" class="tab-content active">
       <div class="summary-bar">
         <div>
-          <div class="summary-stat-lbl">ยอดรวมทั้งคืน</div>
+          <div class="summary-stat-lbl">ยอดรวม</div>
           <div class="summary-stat-val" id="total-expenses-amount">฿0.00</div>
         </div>
         <div style="text-align: right;">
@@ -276,7 +66,7 @@
       <!-- Add Member Form Card -->
       <div class="card">
         <div class="card-h">
-          <h2>➕ เพิ่มสมาชิกใหม่</h2>
+          <h2>เพิ่มสมาชิก</h2>
         </div>
         <form id="add-member-form" onsubmit="handleAddMember(event)">
           <div class="field">
@@ -293,18 +83,18 @@
         </form>
       </div>
 
-      <div class="card" style="border-color: rgba(91,157,255,0.28); background: rgba(91,157,255,0.06);">
-        <div style="font-weight:700; margin-bottom:0.25rem;">📱 พร้อมเพย์ (ผู้รับกรอกเอง)</div>
+      <div class="card info-soft">
+        <div style="font-weight:700; margin-bottom:0.25rem;">พร้อมเพย์</div>
         <p class="muted" style="margin:0; font-size:0.85rem;">
-          แต่ละคนใส่ <strong>เบอร์มือถือ</strong> หรือ <strong>เลขบัตรประชาชน</strong> ที่ผูกพร้อมเพย์
-          — ตอนสรุปโอน เพื่อนจะสแกน QR จ่ายยอดที่ต้องโอนได้ทันที
+          ผู้รับกรอกเบอร์มือถือหรือเลขบัตรประชาชนที่ผูกพร้อมเพย์
+          จากนั้นในแท็บสรุปโอน สามารถสร้าง QR ระบุยอดได้ทันที
         </p>
       </div>
 
       <!-- Members List Card -->
       <div class="card">
         <div class="card-h">
-          <h2>👥 รายชื่อสมาชิกในทริป</h2>
+          <h2>สมาชิกในทริป</h2>
         </div>
         <div id="members-list">
           <!-- Rendered members -->
@@ -316,7 +106,7 @@
     <section id="section-summary" class="tab-content">
       <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
         <div>
-          <h2 style="margin:0;font-size:1.1rem;">💸 ใครต้องโอนใคร</h2>
+          <h2 style="margin:0;font-size:1.1rem;">รายการต้องโอน</h2>
           <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;">
             ยอดสุทธิ = จ่ายจริง − ส่วนที่กิน
             · <span id="summary-build-label" class="badge">…</span>
@@ -334,14 +124,14 @@
 
       <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin:0.25rem 0.15rem 0.65rem;">
         <h3 style="margin:0;font-size:1rem;">รายการต้องโอน</h3>
-        <button type="button" class="btn btn-sm btn-ghost" onclick="copyTransfersOnly()">📋 คัดลอก</button>
+        <button type="button" class="btn btn-sm btn-ghost" onclick="copyTransfersOnly()">คัดลอก</button>
       </div>
       <div id="summary-transfers-list"></div>
 
       <div class="card" style="margin-top:0.85rem;">
         <div class="btn-row" style="flex-direction:column;">
-          <button type="button" class="btn btn-primary btn-block" onclick="shareSummaryAll()">📤 คัดลอกสรุปทั้งก้อน</button>
-          <button type="button" class="btn btn-block" onclick="copyTransfersOnly()">💸 คัดลอกเฉพาะรายการโอน</button>
+          <button type="button" class="btn btn-primary btn-block" onclick="shareSummaryAll()">คัดลอกสรุปทั้งก้อน</button>
+          <button type="button" class="btn btn-block" onclick="copyTransfersOnly()">คัดลอกรายการโอน</button>
         </div>
       </div>
     </section>
@@ -395,7 +185,7 @@
         </p>
         <div class="btn-row" style="width:100%; flex-direction:column;">
           <button type="button" class="btn btn-primary btn-block" onclick="markCurrentPromptPayDone()">✓ โอนแล้ว</button>
-          <button type="button" class="btn btn-block" onclick="copyPromptPayPayload()">📋 คัดลอก payload</button>
+          <button type="button" class="btn btn-block" onclick="copyPromptPayPayload()">คัดลอก payload</button>
           <button type="button" class="btn btn-ghost btn-block" onclick="closePromptPayPay()">ปิด</button>
         </div>
       </div>
@@ -438,7 +228,7 @@
             <button type="button" data-mode="equal" class="on" onclick="setSplitMode('equal')">หารเท่า</button>
             <button type="button" data-mode="shares" onclick="setSplitMode('shares')">สัดส่วน</button>
             <button type="button" data-mode="exact" onclick="setSplitMode('exact')">ระบุบาท</button>
-            <button type="button" data-mode="treat" onclick="setSplitMode('treat')">เลี้ยง 🎁</button>
+            <button type="button" data-mode="treat" onclick="setSplitMode('treat')">เลี้ยง </button>
           </div>
           <div id="split-mode-help" class="split-mode-desc">
             หารเท่ากันทุกคนที่ร่วมรายการ
@@ -472,12 +262,12 @@
   </div>
 
   <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260810g"></script>
-  <script src="js/store.js?v=20260810g"></script>
-  <script src="js/ui.js?v=20260810g"></script>
-  <script src="js/promptpay.js?v=20260810g"></script>
-  <script src="js/qrcode.min.js?v=20260810g"></script>
-  <script src="js/summary-view.js?v=20260810g"></script>
+  <script src="js/money.js?v=20260810h"></script>
+  <script src="js/store.js?v=20260810h"></script>
+  <script src="js/ui.js?v=20260810h"></script>
+  <script src="js/promptpay.js?v=20260810h"></script>
+  <script src="js/qrcode.min.js?v=20260810h"></script>
+  <script src="js/summary-view.js?v=20260810h"></script>
 
   <script>
     // App State
@@ -496,7 +286,7 @@
     const COLORS = ["#c9a227", "#3498db", "#e67e22", "#2ecc71", "#9b59b6", "#e74c3c", "#1abc9c"];
 
     function defaultSavePillText() {
-      return AomStore.isRemoteEnabled() ? '☁️ ซิงก์ Sheet' : '💾 บันทึกอัตโนมัติ';
+      return AomStore.isRemoteEnabled() ? 'ซิงก์กลุ่ม' : 'บันทึกอัตโนมัติ';
     }
 
     function updateSavePillFromRemote() {
@@ -506,15 +296,15 @@
       pill.classList.remove('cloud', 'cloud-err');
       if (st.ok === false) {
         pill.classList.add('cloud-err');
-        pill.textContent = '☁️ ซิงก์ไม่ได้';
+        pill.textContent = 'ซิงก์ไม่ได้';
         pill.title = st.message || 'ซิงก์ Google Sheet ไม่สำเร็จ';
       } else if (st.ok === null) {
         pill.classList.add('cloud');
-        pill.textContent = '☁️ กำลังซิงก์…';
+        pill.textContent = 'กำลังซิงก์…';
         pill.title = st.message || '';
       } else {
         pill.classList.add('cloud');
-        pill.textContent = '☁️ ซิงก์แล้ว';
+        pill.textContent = 'ซิงก์แล้ว';
         pill.title = st.message || 'บันทึกบนเครื่อง + Google Sheet';
       }
     }
@@ -557,7 +347,7 @@
           const pill = document.getElementById('save-pill');
           if (!pill) return;
           const cloud = AomStore.isRemoteEnabled();
-          pill.textContent = cloud ? '☁️ บันทึกแล้ว' : '💾 บันทึกแล้ว';
+          pill.textContent = cloud ? 'บันทึกแล้ว' : 'บันทึกแล้ว';
           pill.classList.toggle('cloud', cloud);
           pill.classList.remove('cloud-err');
           pill.classList.remove('flash');
@@ -651,7 +441,7 @@
         var pill = document.getElementById('save-pill');
         if (pill) {
           pill.classList.add('cloud');
-          pill.textContent = '☁️ กำลังโหลด…';
+          pill.textContent = 'กำลังโหลด…';
         }
         // ดึงจาก Sheet ก่อน (เพื่อนอาจอัปเดตจากมือถืออื่น)
         AomStore.pullFromRemote()
@@ -990,9 +780,9 @@
       if (!expenses.length) {
         container.innerHTML = `
           <div class="card empty">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💸</div>
+            <div class="empty-icon">∅</div>
             <div style="font-weight: 700; font-size: 1.1rem; color: var(--text);">ยังไม่มีรายการจ่าย</div>
-            <div style="margin-top: 0.38rem;">กดปุ่ม <strong>"+ เพิ่มรายการ"</strong> ด้านล่างเพื่อเพิ่มรายการแรก</div>
+            <div style="margin-top: 0.38rem;">กดปุ่ม <strong>"เพิ่มรายการ"</strong> ด้านล่างเพื่อเพิ่มรายการแรก</div>
           </div>
         `;
         return;
@@ -1002,7 +792,7 @@
         equal: 'หารเท่า',
         shares: 'สัดส่วน',
         exact: 'ระบุบาท',
-        treat: 'เลี้ยง 🎁'
+        treat: 'เลี้ยง '
       };
 
       container.innerHTML = expenses.map(function (e) {
@@ -1029,8 +819,8 @@
                 <strong style="color: var(--text);">${escapeHtml(paidByName)}</strong>
               </div>
               <div class="exp-item-actions">
-                <button type="button" class="btn btn-ghost btn-sm btn-icon" onclick="openExpenseModal('${e.id}')" title="แก้ไข">✏️ แก้ไข</button>
-                <button type="button" class="btn btn-ghost btn-sm btn-icon" style="color: var(--bad);" onclick="deleteExpenseDirect('${e.id}')" title="ลบ">🗑️</button>
+                <button type="button" class="btn btn-ghost btn-sm btn-icon" onclick="openExpenseModal('${e.id}')" title="แก้ไข">แก้ไข</button>
+                <button type="button" class="btn btn-ghost btn-sm btn-icon" style="color: var(--bad);" onclick="deleteExpenseDirect('${e.id}')" title="ลบ">ลบ</button>
               </div>
             </div>
             <div style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); display: flex; align-items: center; gap: 0.4rem;">
@@ -1071,7 +861,7 @@
         const partCount = expenses.filter(function (e) { return (e.participants || []).includes(m.id); }).length;
         const hasPP = AomPromptPay.memberHasPromptPay(m);
         const ppLine = hasPP
-          ? '<span class="pp-badge">📱 ' + escapeHtml(AomPromptPay.maskId(AomPromptPay.memberPromptPay(m))) + ' · ' + escapeHtml(AomPromptPay.kindLabel(AomPromptPay.detectKind(AomPromptPay.memberPromptPay(m)))) + '</span>'
+          ? '<span class="pp-badge">' + escapeHtml(AomPromptPay.maskId(AomPromptPay.memberPromptPay(m))) + ' · ' + escapeHtml(AomPromptPay.kindLabel(AomPromptPay.detectKind(AomPromptPay.memberPromptPay(m)))) + '</span>'
           : '<span class="muted" style="font-size:0.78rem;">ยังไม่ตั้งพร้อมเพย์</span>';
 
         return `
@@ -1413,7 +1203,7 @@
         const paidByName = AomUI.memberName(currentSession, paidById);
         container.innerHTML = `
           <div style="font-size: 0.85rem; color: var(--accent); background: rgba(240, 180, 41, 0.1); padding: 0.7rem 0.85rem; border-radius: 12px; border: 1px solid rgba(240, 180, 41, 0.3);">
-            🎁 <strong>${escapeHtml(paidByName)}</strong> เป็นเจ้าภาพเลี้ยงรายการนี้ (รับผิดชอบเต็ม 100% คนอื่นไม่ต้องหาร)
+             <strong>${escapeHtml(paidByName)}</strong> เป็นเจ้าภาพเลี้ยงรายการนี้ (รับผิดชอบเต็ม 100% คนอื่นไม่ต้องหาร)
           </div>
         `;
         return;

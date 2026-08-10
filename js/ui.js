@@ -187,7 +187,7 @@
 
   function buildShareText(session, plan) {
     var lines = [];
-    lines.push("💸 " + (session.title || "ทริป"));
+    lines.push((session.title || "ทริป"));
     lines.push("วันที่ " + (session.date || ""));
     lines.push("");
     lines.push("— ยอดต่อคน —");

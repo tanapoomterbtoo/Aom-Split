@@ -1,9 +1,9 @@
 /**
  * Aom Split — summary / transfers view (DOM-only, no brittle HTML strings)
- * Build: 20260810g
+ * Build: 20260810h
  */
 (function (global) {
-  var BUILD = "20260810g";
+  var BUILD = "20260810h";
 
   function el(tag, props, children) {
     var node = document.createElement(tag);
@@ -191,7 +191,7 @@
     clear(transfersBox);
     if (!plan.transfers || !plan.transfers.length) {
       var empty = el("div", { className: "card empty" });
-      empty.appendChild(el("div", { style: { fontSize: "2rem", marginBottom: "0.35rem" }, text: "🎉" }));
+      empty.appendChild(el("div", { style: { fontSize: "2rem", marginBottom: "0.35rem" }, text: "✓" }));
       empty.appendChild(
         el("div", { style: { fontWeight: "700", color: "var(--good)" }, text: "ลงตัวแล้ว" })
       );
@@ -245,7 +245,7 @@
       who.appendChild(el("span", { text: toName }));
       top.appendChild(who);
       if (isDone) {
-        top.appendChild(el("span", { className: "badge ok", text: "✓ โอนแล้ว" }));
+        top.appendChild(el("span", { className: "badge ok", text: "โอนแล้ว" }));
       }
       card.appendChild(top);
 
@@ -268,7 +268,7 @@
           el("button", {
             type: "button",
             className: "btn btn-sm btn-primary",
-            text: "📱 พร้อมเพย์",
+            text: "พร้อมเพย์",
             onClick: function () {
               if (typeof opts.onPromptPay === "function") opts.onPromptPay(t, toMember);
             },
@@ -279,7 +279,7 @@
           el("button", {
             type: "button",
             className: "btn btn-sm btn-ghost",
-            text: "⚙️ ตั้งพร้อมเพย์ผู้รับ",
+            text: "ตั้งพร้อมเพย์ผู้รับ",
             onClick: function () {
               if (typeof opts.onSetupPromptPay === "function") opts.onSetupPromptPay(t.to);
             },
@@ -291,7 +291,7 @@
         el("button", {
           type: "button",
           className: "btn btn-sm",
-          text: "📋 คัดลอก",
+          text: "คัดลอก",
           onClick: function () {
             if (typeof opts.onCopyOne === "function") opts.onCopyOne(idx);
           },
