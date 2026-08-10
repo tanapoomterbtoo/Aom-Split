@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260808e"></script>
+  <script src="js/boot.js?v=20260810a"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Aom Split — หารค่าเหล้าเพื่อน (Who Owes Whom)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/app.css?v=20260808e" />
+  <link rel="stylesheet" href="css/app.css?v=20260810a" />
 </head>
 <body>
   <!-- App Header -->
@@ -38,6 +38,49 @@
           <span style="font-weight: 700;">+ สร้างทริปใหม่</span>
         </button>
       </div>
+    </section>
+
+    <!-- Google Sheet shared DB -->
+    <section id="remote-card" class="card remote-card">
+      <div class="card-h">
+        <h2 style="margin:0;">☁️ Google Sheet (แชร์กับเพื่อน)</h2>
+        <span id="remote-badge" class="badge">เฉพาะเครื่อง</span>
+      </div>
+      <p class="muted" style="margin:0 0 0.5rem; font-size:0.85rem;">
+        ใช้ Sheet เป็นฐานข้อมูลกลาง — เพื่อนใส่ URL + token ชุดเดียวกัน แล้วเห็นทริปเดียวกัน
+      </p>
+      <div class="switch-row">
+        <label for="remote-enabled">ใช้ Sheet เป็น DB</label>
+        <label class="switch" title="เปิดเมื่อมี Web App URL + token">
+          <input type="checkbox" id="remote-enabled" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="field" style="margin-bottom:0.55rem;">
+        <label for="remote-url">Web App URL (จาก Apps Script)</label>
+        <input type="url" id="remote-url" class="input" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" />
+      </div>
+      <div class="field" style="margin-bottom:0.55rem;">
+        <label for="remote-token">Token (รหัสกลุ่มเพื่อน)</label>
+        <input type="text" id="remote-token" class="input" placeholder="aom_…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="btn-row">
+        <button type="button" id="btn-remote-save" class="btn btn-primary btn-sm">💾 บันทึกการเชื่อม</button>
+        <button type="button" id="btn-remote-test" class="btn btn-sm">🔌 ทดสอบ</button>
+        <button type="button" id="btn-remote-sync" class="btn btn-sm">🔄 ซิงก์ตอนนี้</button>
+      </div>
+      <div id="remote-status" class="remote-status">ยังไม่ได้เชื่อม Sheet — ข้อมูลอยู่แค่เบราว์เซอร์นี้</div>
+      <details class="details-hint">
+        <summary>วิธีตั้งค่าครั้งแรก (คนเดียวในกลุ่ม)</summary>
+        <ol>
+          <li>สร้าง Google Sheet ใหม่ → <strong>Extensions → Apps Script</strong></li>
+          <li>วางโค้ดจากโฟลเดอร์ <code>apps-script/Code.gs</code> ใน repo</li>
+          <li>รัน <code>setupOnce</code> หนึ่งครั้ง → คัดลอก <strong>token</strong></li>
+          <li>Deploy → Web app → access <strong>Anyone</strong> → คัดลอก URL</li>
+          <li>ใส่ URL + token ด้านบน แล้วส่งชุดเดียวกันให้เพื่อน</li>
+        </ol>
+        <p style="margin:0.4rem 0 0;">รายละเอียดเต็ม: ไฟล์ <code>apps-script/README.md</code></p>
+      </details>
     </section>
 
     <!-- Persistence notice + backup -->
@@ -99,9 +142,9 @@
   </div>
 
   <!-- Scripts in required order -->
-  <script src="js/money.js?v=20260808e"></script>
-  <script src="js/store.js?v=20260808e"></script>
-  <script src="js/ui.js?v=20260808e"></script>
+  <script src="js/money.js?v=20260810a"></script>
+  <script src="js/store.js?v=20260810a"></script>
+  <script src="js/ui.js?v=20260810a"></script>
   <script>
     (function () {
       const modalEl = document.getElementById("modal-create");
@@ -120,6 +163,73 @@
         }
       }
 
+      function loadRemoteForm() {
+        const cfg = AomStore.getRemoteConfig();
+        document.getElementById("remote-enabled").checked = !!cfg.enabled;
+        document.getElementById("remote-url").value = cfg.webAppUrl || "";
+        document.getElementById("remote-token").value = cfg.token || "";
+        refreshRemoteUi();
+      }
+
+      function refreshRemoteUi() {
+        const cfg = AomStore.getRemoteConfig();
+        const card = document.getElementById("remote-card");
+        const badge = document.getElementById("remote-badge");
+        const statusEl = document.getElementById("remote-status");
+        const st = AomStore.getRemoteStatus();
+        const on = !!(cfg.enabled && cfg.webAppUrl && cfg.token);
+
+        if (card) {
+          card.classList.toggle("connected", on && st.ok !== false);
+        }
+        if (badge) {
+          badge.textContent = on ? "☁️ Sheet" : "เฉพาะเครื่อง";
+          badge.className = "badge " + (on ? "ok" : "");
+        }
+        if (statusEl) {
+          statusEl.className = "remote-status";
+          if (!cfg.webAppUrl && !cfg.enabled) {
+            statusEl.textContent = "ยังไม่ได้เชื่อม Sheet — ข้อมูลอยู่แค่เบราว์เซอร์นี้";
+          } else if (cfg.enabled && (!cfg.webAppUrl || !cfg.token)) {
+            statusEl.classList.add("err");
+            statusEl.textContent = "เปิดใช้ Sheet แล้ว แต่ยังขาด URL หรือ token";
+          } else if (st.ok === false) {
+            statusEl.classList.add("err");
+            statusEl.textContent = st.message || "เชื่อม Sheet ไม่สำเร็จ";
+          } else if (st.ok === null && on) {
+            statusEl.classList.add("pending");
+            statusEl.textContent = st.message || "กำลังซิงก์…";
+          } else {
+            if (on) statusEl.classList.add("ok");
+            statusEl.textContent = st.message || (on ? "พร้อมซิงก์ Google Sheet" : "ใช้เฉพาะเครื่องนี้");
+          }
+        }
+      }
+
+      function saveRemoteFromForm() {
+        const enabled = document.getElementById("remote-enabled").checked;
+        const webAppUrl = document.getElementById("remote-url").value.trim();
+        const token = document.getElementById("remote-token").value.trim();
+        if (enabled && !webAppUrl) {
+          AomUI.toast("ใส่ Web App URL ก่อน");
+          return null;
+        }
+        if (enabled && !token) {
+          AomUI.toast("ใส่ token กลุ่มก่อน");
+          return null;
+        }
+        try {
+          return AomStore.setRemoteConfig({
+            enabled: enabled,
+            webAppUrl: webAppUrl,
+            token: token,
+          });
+        } catch (err) {
+          AomUI.toast((err && err.message) || "บันทึกการตั้งค่าไม่สำเร็จ");
+          return null;
+        }
+      }
+
       function refreshSaveBanner() {
         const banner = document.getElementById("save-banner");
         const desc = document.getElementById("save-banner-desc");
@@ -132,12 +242,20 @@
           return;
         }
         banner.classList.remove("warn");
+        var cloudNote = info.remoteEnabled
+          ? " · ☁️ ซิงก์ขึ้น Google Sheet ด้วย"
+          : " · อยากแชร์กับเพื่อนให้เชื่อม Google Sheet ด้านบน";
         desc.innerHTML =
-          "ทริปและรายการถูกเก็บในเบราว์เซอร์เครื่องนี้ · " +
+          "ทริปและรายการถูก cache ในเบราว์เซอร์ · " +
           info.sessionCount +
           " ทริป · บันทึกล่าสุด " +
           formatWhen(info.savedAt) +
-          "<br/><span style=\"opacity:0.9\">ใช้เครื่อง/เบราว์เซอร์เดิมจะเจอข้อมูลเดิม · อยากย้ายเครื่องให้ส่งออกสำรอง</span>";
+          "<br/><span style=\"opacity:0.9\">" +
+          (info.remoteEnabled
+            ? "แหล่งความจริงหลักคือ Google Sheet ของกลุ่ม"
+            : "ใช้เครื่อง/เบราว์เซอร์เดิมจะเจอข้อมูลเดิม · อยากย้ายเครื่องให้ส่งออกสำรอง") +
+          cloudNote +
+          "</span>";
       }
 
       function openModal() {
@@ -172,7 +290,18 @@
         try {
           const session = AomStore.createSession(title, names);
           closeModal();
-          AomUI.go("session.html", { id: session.id });
+          var go = function () {
+            AomUI.go("session.html", { id: session.id });
+          };
+          if (AomStore.isRemoteEnabled()) {
+            AomUI.toast("กำลังอัปขึ้น Sheet…");
+            AomStore.pushSessionToRemote(session).then(go).catch(function (err) {
+              AomUI.toast((err && err.message) || "อัป Sheet ไม่สำเร็จ — เปิดทริปจากเครื่องนี้ก่อน");
+              go();
+            });
+          } else {
+            go();
+          }
         } catch (err) {
           AomUI.toast((err && err.message) || "บันทึกไม่สำเร็จ");
         }
@@ -324,6 +453,9 @@
             AomUI.toast("นำเข้าสำเร็จ · รวม " + n + " ทริป");
             refreshSaveBanner();
             render();
+            if (AomStore.isRemoteEnabled()) {
+              AomStore.pushAllToRemote().catch(function () {});
+            }
           } catch (err) {
             AomUI.toast((err && err.message) || "นำเข้าไม่สำเร็จ");
           }
@@ -334,6 +466,65 @@
         reader.readAsText(file, "utf-8");
       });
 
+      document.getElementById("btn-remote-save").addEventListener("click", function () {
+        const cfg = saveRemoteFromForm();
+        if (!cfg) return;
+        AomUI.toast(cfg.enabled ? "บันทึกการเชื่อม Sheet แล้ว" : "ปิด Sheet — ใช้เฉพาะเครื่อง");
+        refreshRemoteUi();
+        refreshSaveBanner();
+        if (cfg.enabled && cfg.webAppUrl && cfg.token) {
+          AomStore.syncNow()
+            .then(function () {
+              AomUI.toast("ซิงก์กับ Sheet แล้ว");
+              render();
+              refreshSaveBanner();
+              refreshRemoteUi();
+            })
+            .catch(function (err) {
+              AomUI.toast((err && err.message) || "ซิงก์ไม่สำเร็จ");
+              refreshRemoteUi();
+            });
+        }
+      });
+
+      document.getElementById("btn-remote-test").addEventListener("click", function () {
+        saveRemoteFromForm();
+        AomUI.toast("กำลังทดสอบ…");
+        AomStore.testRemoteConnection()
+          .then(function (r) {
+            if (r.authed) {
+              AomUI.toast("เชื่อมได้ · มี " + (r.count || 0) + " ทริปบน Sheet");
+            } else {
+              AomUI.toast("URL ใช้ได้ — ใส่ token แล้วทดสอบอีกครั้ง");
+            }
+            refreshRemoteUi();
+          })
+          .catch(function (err) {
+            AomUI.toast((err && err.message) || "ทดสอบไม่สำเร็จ");
+            refreshRemoteUi();
+          });
+      });
+
+      document.getElementById("btn-remote-sync").addEventListener("click", function () {
+        if (!saveRemoteFromForm()) return;
+        if (!AomStore.isRemoteEnabled()) {
+          AomUI.toast("เปิดใช้ Sheet และใส่ URL + token ก่อน");
+          return;
+        }
+        AomUI.toast("กำลังซิงก์…");
+        AomStore.syncNow()
+          .then(function () {
+            AomUI.toast("ซิงก์ครบแล้ว");
+            render();
+            refreshSaveBanner();
+            refreshRemoteUi();
+          })
+          .catch(function (err) {
+            AomUI.toast((err && err.message) || "ซิงก์ไม่สำเร็จ");
+            refreshRemoteUi();
+          });
+      });
+
       modalEl.addEventListener("click", function (e) {
         if (e.target === modalEl) closeModal();
       });
@@ -341,10 +532,27 @@
       window.addEventListener("aom-split-saved", function () {
         refreshSaveBanner();
       });
+      window.addEventListener("aom-split-remote", function () {
+        refreshRemoteUi();
+      });
 
-      // Initial render
+      // Initial render + optional pull from Sheet
+      loadRemoteForm();
       refreshSaveBanner();
       render();
+
+      if (AomStore.isRemoteEnabled()) {
+        // ดึงของเพื่อน + ดันทริปที่ยังอยู่แค่เครื่องนี้ขึ้น Sheet
+        AomStore.syncNow()
+          .then(function () {
+            render();
+            refreshSaveBanner();
+            refreshRemoteUi();
+          })
+          .catch(function () {
+            refreshRemoteUi();
+          });
+      }
     })();
   </script>
 </body>

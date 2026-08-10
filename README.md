@@ -34,9 +34,23 @@ npx --yes serve .
 - ทุกทริป / รายการจ่าย / สถานะโอน ถูก**บันทึกอัตโนมัติ**ในเบราว์เซอร์เครื่องนี้ (`localStorage` · key `aom_split_v1`)
 - เปิดเว็บเดิมบนเครื่องเดิม → เจอข้อมูลเดิม
 - หน้าแรกมีปุ่ม **ส่งออกสำรอง / นำเข้าสำรอง** (ไฟล์ `.json`) ไว้ย้ายเครื่องหรือกันข้อมูลหาย
-- **ไม่มีเซิร์ฟเวอร์กลาง** — ข้อมูลไม่อัปขึ้นคลาวด์ และไม่แชร์ข้ามมือถือจนกว่าจะส่งออก/นำเข้า
 
-> เคลียร์ข้อมูลเว็บ / โหมดไม่ระบุตัวตน อาจทำให้ข้อมูลหาย — แนะนำส่งออกสำรองเป็นระยะ
+### แชร์กับเพื่อนผ่าน Google Sheet (DB กลาง)
+
+กลุ่มเพื่อนใช้ **Google Sheet ชุดเดียว** เป็นฐานข้อมูล:
+
+1. คนหนึ่งตั้ง Apps Script ตาม [`apps-script/README.md`](./apps-script/README.md) → ได้ **Web App URL** + **token**
+2. ทุกคนเปิดแอป → การ์ด **Google Sheet (แชร์กับเพื่อน)** → ใส่ URL + token ชุดเดียวกัน → เปิดสวิตช์ → ซิงก์
+3. บันทึกทริป/รายการจะอัปขึ้น Sheet อัตโนมัติ · เปิดหน้าทริปจะดึงของล่าสุดจาก Sheet
+
+| | |
+|--|--|
+| โค้ดฝั่ง Sheet | `apps-script/Code.gs` |
+| คู่มือ deploy | `apps-script/README.md` |
+| conflict | ใครบันทึกล่าสุดชนะ (`updatedAt`) |
+
+> ยัง cache บนเครื่อง — ออฟไลน์ใช้ต่อได้ แล้วค่อยซิงก์เมื่อมีเน็ต  
+> อย่าโพสต์ URL+token สาธารณะ (ใครมีครบทั้งคู่แก้ข้อมูลกลุ่มได้)
 
 ---
 
@@ -62,14 +76,18 @@ npx --yes serve .
 
 ```text
 .
-├── index.html      # รายการทริป / สร้างใหม่
-├── session.html    # รายการ · สมาชิก · สรุปโอน (แท็บในหน้าเดียว)
-├── summary.html    # redirect → session.html?tab=summary
-├── css/app.css     # UI มือถือ dark theme
+├── index.html           # รายการทริป / สร้างใหม่ / เชื่อม Sheet
+├── session.html         # รายการ · สมาชิก · สรุปโอน (แท็บในหน้าเดียว)
+├── summary.html         # redirect → session.html?tab=summary
+├── css/app.css          # UI มือถือ dark theme
 ├── js/
-│   ├── money.js    # คำนวณเงิน (สตางค์) + settle
-│   ├── store.js    # localStorage
-│   └── ui.js       # helper UI / แชร์ข้อความ
+│   ├── money.js         # คำนวณเงิน (สตางค์) + settle
+│   ├── store.js         # localStorage + Google Sheet sync
+│   ├── ui.js            # helper UI / แชร์ข้อความ
+│   └── summary-view.js  # แท็บสรุปโอน
+├── apps-script/
+│   ├── Code.gs          # backend บน Google Apps Script
+│   └── README.md        # วิธี deploy Sheet เป็น DB
 └── README.md
 ```
 

@@ -1,9 +1,15 @@
 /**
- * Aom Split — localStorage persistence (auto-save on this device)
+ * Aom Split — localStorage + optional Google Sheet (Apps Script) sync
+ * Build: 20260810a
  */
 (function (global) {
   const KEY = "aom_split_v1";
   const META_KEY = "aom_split_meta_v1";
+  const REMOTE_KEY = "aom_split_remote_v1";
+
+  var pushTimer = null;
+  var lastRemoteStatus = { ok: null, at: null, message: "", mode: "local" };
+  var syncInFlight = null;
 
   function uid(prefix) {
     return (
@@ -64,6 +70,21 @@
     }
   }
 
+  function emit(name, detail) {
+    try {
+      global.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
+    } catch (e) {
+      /* old browsers */
+    }
+  }
+
+  function setRemoteStatus(partial) {
+    lastRemoteStatus = Object.assign({}, lastRemoteStatus, partial, {
+      at: Date.now(),
+    });
+    emit("aom-split-remote", lastRemoteStatus);
+  }
+
   function save(data) {
     if (!isStorageAvailable()) {
       writeMeta(false, "localStorage unavailable");
@@ -76,15 +97,11 @@
       data.savedAt = Date.now();
       localStorage.setItem(KEY, JSON.stringify(data));
       writeMeta(true, null);
-      try {
-        global.dispatchEvent(
-          new CustomEvent("aom-split-saved", {
-            detail: { at: data.savedAt, count: (data.sessions || []).length },
-          })
-        );
-      } catch (e) {
-        /* old browsers */
-      }
+      emit("aom-split-saved", {
+        at: data.savedAt,
+        count: (data.sessions || []).length,
+      });
+      scheduleRemotePush();
       return true;
     } catch (e) {
       writeMeta(false, String(e && e.message));
@@ -130,6 +147,17 @@
       return s.id !== id;
     });
     save(data);
+    // push delete to sheet immediately when remote on
+    var cfg = getRemoteConfig();
+    if (cfg.enabled && cfg.webAppUrl) {
+      remoteRequest("delete", { id: id }).catch(function (err) {
+        setRemoteStatus({
+          ok: false,
+          mode: "cloud",
+          message: (err && err.message) || "ลบบน Sheet ไม่สำเร็จ",
+        });
+      });
+    }
   }
 
   function createSession(title, memberNames) {
@@ -172,11 +200,9 @@
   }
 
   function transferKey(t) {
-    // avoid "->" / quotes (HTML-unsafe in attributes / old marks)
     return String(t.from) + "__" + String(t.to) + "__" + String(t.amountMinor);
   }
 
-  /** Accept legacy keys "from->to:amount" when reading marks */
   function transferKeyAliases(t) {
     var modern = transferKey(t);
     var legacy = String(t.from) + "->" + String(t.to) + ":" + String(t.amountMinor);
@@ -192,7 +218,6 @@
     return false;
   }
 
-  /** Full backup object for export */
   function exportData() {
     const data = load();
     return {
@@ -207,10 +232,6 @@
     return JSON.stringify(exportData(), null, 2);
   }
 
-  /**
-   * Import backup.
-   * mode: "replace" | "merge" (default merge by session id)
-   */
   function importData(payload, mode) {
     mode = mode || "merge";
     let obj = payload;
@@ -234,7 +255,6 @@
         if (!existing) {
           map[s.id] = s;
         } else {
-          // keep newer
           const et = existing.updatedAt || existing.createdAt || 0;
           const nt = s.updatedAt || s.createdAt || 0;
           map[s.id] = nt >= et ? s : existing;
@@ -280,17 +300,327 @@
     } catch (e) {
       bytes = 0;
     }
+    const remote = getRemoteConfig();
     return {
       available: isStorageAvailable(),
       sessionCount: (data.sessions || []).length,
       savedAt: data.savedAt || (meta && meta.lastSavedAt) || null,
       approxBytes: bytes,
       key: KEY,
+      remoteEnabled: !!(remote.enabled && remote.webAppUrl),
+      remote: getRemoteStatus(),
     };
+  }
+
+  /* ───────── Google Sheet remote ───────── */
+
+  function normalizeRemoteUrl(url) {
+    url = String(url || "").trim();
+    if (!url) return "";
+    // accept /exec or /dev
+    return url.replace(/\s+/g, "");
+  }
+
+  function getRemoteConfig() {
+    try {
+      const raw = localStorage.getItem(REMOTE_KEY);
+      if (!raw) {
+        return { enabled: false, webAppUrl: "", token: "" };
+      }
+      const o = JSON.parse(raw);
+      return {
+        enabled: !!o.enabled,
+        webAppUrl: normalizeRemoteUrl(o.webAppUrl),
+        token: String(o.token || "").trim(),
+      };
+    } catch (e) {
+      return { enabled: false, webAppUrl: "", token: "" };
+    }
+  }
+
+  function setRemoteConfig(cfg) {
+    cfg = cfg || {};
+    const next = {
+      enabled: !!cfg.enabled,
+      webAppUrl: normalizeRemoteUrl(cfg.webAppUrl),
+      token: String(cfg.token || "").trim(),
+    };
+    if (!isStorageAvailable()) {
+      throw new Error("บันทึกการตั้งค่าไม่ได้");
+    }
+    localStorage.setItem(REMOTE_KEY, JSON.stringify(next));
+    if (next.enabled && next.webAppUrl) {
+      setRemoteStatus({ mode: "cloud", message: "เชื่อม Google Sheet แล้ว", ok: null });
+    } else {
+      setRemoteStatus({ mode: "local", message: "ใช้เฉพาะเครื่องนี้", ok: true });
+    }
+    emit("aom-split-remote-config", next);
+    return next;
+  }
+
+  function getRemoteStatus() {
+    return Object.assign({}, lastRemoteStatus);
+  }
+
+  function isRemoteEnabled() {
+    var c = getRemoteConfig();
+    return !!(c.enabled && c.webAppUrl && c.token);
+  }
+
+  /**
+   * Call Apps Script web app.
+   * Content-Type text/plain avoids CORS preflight with Google Apps Script.
+   */
+  function remoteRequest(action, extra) {
+    var cfg = getRemoteConfig();
+    if (!cfg.webAppUrl) {
+      return Promise.reject(new Error("ยังไม่ได้ใส่ Web App URL"));
+    }
+    var body = Object.assign({ action: action, token: cfg.token }, extra || {});
+
+    setRemoteStatus({ mode: "cloud", message: "กำลังคุยกับ Google Sheet…", ok: null });
+
+    return fetch(cfg.webAppUrl, {
+      method: "POST",
+      redirect: "follow",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(body),
+    })
+      .then(function (res) {
+        return res.text().then(function (text) {
+          var data;
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            throw new Error(
+              "คำตอบจาก Sheet ไม่ใช่ JSON — ตรวจว่า Deploy แบบ Web app แล้ว (Anyone)"
+            );
+          }
+          if (!res.ok && !data) {
+            throw new Error("HTTP " + res.status);
+          }
+          if (data && data.ok === false) {
+            var msg =
+              data.message ||
+              data.error ||
+              "คำขอไม่สำเร็จ";
+            if (data.error === "unauthorized") {
+              msg = "token ไม่ถูกต้อง — ขอ token ใหม่จากคนที่สร้าง Sheet";
+            }
+            var err = new Error(msg);
+            err.code = data.error;
+            throw err;
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        setRemoteStatus({
+          ok: true,
+          mode: "cloud",
+          message: "ซิงก์ Google Sheet แล้ว",
+        });
+        return data;
+      })
+      .catch(function (err) {
+        setRemoteStatus({
+          ok: false,
+          mode: "cloud",
+          message: (err && err.message) || "เชื่อม Sheet ไม่สำเร็จ",
+        });
+        throw err;
+      });
+  }
+
+  function sessionTime(s) {
+    return (s && (s.updatedAt || s.createdAt)) || 0;
+  }
+
+  /** Merge remote sessions into local: newer updatedAt wins; remote-deleted removes local */
+  function mergeSessions(localList, remoteList, remoteDeletedIds) {
+    var map = {};
+    (localList || []).forEach(function (s) {
+      if (s && s.id) map[s.id] = s;
+    });
+    (remoteList || []).forEach(function (s) {
+      if (!s || !s.id) return;
+      var cur = map[s.id];
+      if (!cur || sessionTime(s) >= sessionTime(cur)) {
+        map[s.id] = s;
+      }
+    });
+    (remoteDeletedIds || []).forEach(function (id) {
+      delete map[id];
+    });
+    return Object.keys(map).map(function (k) {
+      return map[k];
+    });
+  }
+
+  function scheduleRemotePush() {
+    if (!isRemoteEnabled()) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () {
+      pushAllToRemote().catch(function () {
+        /* status already set */
+      });
+    }, 700);
+  }
+
+  /** Push every local session (and rely on soft-delete for removed ones via deleteSession) */
+  function pushAllToRemote() {
+    if (!isRemoteEnabled()) {
+      return Promise.resolve({ skipped: true });
+    }
+    var sessions = load().sessions || [];
+    // sequential upserts to reduce Apps Script race on same sheet
+    var chain = Promise.resolve();
+    var count = 0;
+    sessions.forEach(function (s) {
+      chain = chain.then(function () {
+        return remoteRequest("upsert", { session: s }).then(function () {
+          count++;
+        });
+      });
+    });
+    return chain.then(function () {
+      setRemoteStatus({
+        ok: true,
+        mode: "cloud",
+        message: "อัปโหลด " + count + " ทริปขึ้น Sheet แล้ว",
+      });
+      return { count: count };
+    });
+  }
+
+  function pushSessionToRemote(session) {
+    if (!isRemoteEnabled() || !session) {
+      return Promise.resolve({ skipped: true });
+    }
+    return remoteRequest("upsert", { session: session });
+  }
+
+  /**
+   * Pull from Sheet and merge into localStorage.
+   * @returns {Promise<{count:number, merged:number}>}
+   */
+  function pullFromRemote() {
+    if (!isRemoteEnabled()) {
+      return Promise.resolve({ skipped: true, count: 0 });
+    }
+    if (syncInFlight) return syncInFlight;
+
+    syncInFlight = remoteRequest("list", {})
+      .then(function (data) {
+        var remoteSessions = (data && data.sessions) || [];
+        var deletedIds = (data && data.deletedIds) || [];
+        var local = load();
+        var merged = mergeSessions(local.sessions, remoteSessions, deletedIds);
+        local.sessions = merged;
+        // save without re-pushing immediately would still schedule push — OK (idempotent)
+        // avoid infinite loop: temporarily clear enabled? No — push after pull is fine (same data)
+        if (!isStorageAvailable()) {
+          throw new Error("บันทึก local ไม่ได้");
+        }
+        local.version = local.version || 1;
+        local.savedAt = Date.now();
+        localStorage.setItem(KEY, JSON.stringify(local));
+        writeMeta(true, null);
+        emit("aom-split-saved", {
+          at: local.savedAt,
+          count: merged.length,
+          source: "pull",
+        });
+        setRemoteStatus({
+          ok: true,
+          mode: "cloud",
+          message: "ดึง " + remoteSessions.length + " ทริปจาก Sheet แล้ว",
+        });
+        return { count: remoteSessions.length, merged: merged.length };
+      })
+      .finally(function () {
+        syncInFlight = null;
+      });
+
+    return syncInFlight;
+  }
+
+  /**
+   * Full sync: pull merge, then push local-only newer rows.
+   */
+  function syncNow() {
+    if (!isRemoteEnabled()) {
+      return Promise.reject(new Error("ยังไม่ได้เชื่อม Google Sheet (URL + token)"));
+    }
+    return pullFromRemote().then(function (pullResult) {
+      return pushAllToRemote().then(function (pushResult) {
+        setRemoteStatus({
+          ok: true,
+          mode: "cloud",
+          message: "ซิงก์ครบแล้ว · Sheet " + (pullResult.count || 0) + " ทริป",
+        });
+        return { pull: pullResult, push: pushResult };
+      });
+    });
+  }
+
+  function testRemoteConnection() {
+    var cfg = getRemoteConfig();
+    if (!cfg.webAppUrl) {
+      return Promise.reject(new Error("ใส่ Web App URL ก่อน"));
+    }
+    // ping without requiring success auth first
+    return fetch(cfg.webAppUrl, {
+      method: "POST",
+      redirect: "follow",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "ping" }),
+    })
+      .then(function (res) {
+        return res.text().then(function (text) {
+          var data;
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            throw new Error("URL ไม่ตอบเป็น JSON — ตรวจ Web App URL");
+          }
+          if (!data || data.ok !== true) {
+            throw new Error((data && data.message) || "ping ไม่สำเร็จ");
+          }
+          // then auth check via list
+          if (!cfg.token) {
+            setRemoteStatus({
+              ok: true,
+              mode: "cloud",
+              message: "URL ใช้ได้ — ยังไม่มี token",
+            });
+            return { ping: data, authed: false };
+          }
+          return remoteRequest("list", {}).then(function (listData) {
+            return {
+              ping: data,
+              authed: true,
+              count: (listData.sessions || []).length,
+            };
+          });
+        });
+      });
+  }
+
+  // init status
+  try {
+    if (isRemoteEnabled()) {
+      setRemoteStatus({ mode: "cloud", message: "พร้อมซิงก์ Google Sheet", ok: null });
+    } else {
+      setRemoteStatus({ mode: "local", message: "ใช้เฉพาะเครื่องนี้", ok: true });
+    }
+  } catch (e) {
+    /* ignore */
   }
 
   global.AomStore = {
     KEY: KEY,
+    REMOTE_KEY: REMOTE_KEY,
     uid: uid,
     load: load,
     save: save,
@@ -310,5 +640,16 @@
     downloadBackup: downloadBackup,
     storageInfo: storageInfo,
     getMeta: getMeta,
+    // remote
+    getRemoteConfig: getRemoteConfig,
+    setRemoteConfig: setRemoteConfig,
+    getRemoteStatus: getRemoteStatus,
+    isRemoteEnabled: isRemoteEnabled,
+    remoteRequest: remoteRequest,
+    pullFromRemote: pullFromRemote,
+    pushAllToRemote: pushAllToRemote,
+    pushSessionToRemote: pushSessionToRemote,
+    syncNow: syncNow,
+    testRemoteConnection: testRemoteConnection,
   };
 })(typeof window !== "undefined" ? window : globalThis);

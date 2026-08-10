@@ -434,3 +434,98 @@ label {
   gap: 0.45rem;
   margin-top: 0.55rem;
 }
+
+/* Google Sheet remote */
+.remote-card {
+  border-color: rgba(91, 157, 255, 0.28);
+  background: rgba(91, 157, 255, 0.06);
+}
+.remote-card.connected {
+  border-color: rgba(61, 214, 140, 0.35);
+  background: rgba(61, 214, 140, 0.07);
+}
+.remote-card .remote-status {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+.remote-card .remote-status.ok { color: var(--good); }
+.remote-card .remote-status.err { color: var(--bad); }
+.remote-card .remote-status.pending { color: var(--accent); }
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.65rem 0 0.35rem;
+}
+.switch-row label {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.switch {
+  position: relative;
+  width: 46px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch .slider {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+.switch .slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  top: 3px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: 0.15s ease;
+}
+.switch input:checked + .slider {
+  background: rgba(61, 214, 140, 0.25);
+  border-color: rgba(61, 214, 140, 0.5);
+}
+.switch input:checked + .slider::before {
+  transform: translateX(18px);
+  background: var(--good);
+}
+.save-pill.cloud {
+  color: var(--info);
+  background: rgba(91, 157, 255, 0.12);
+  border-color: rgba(91, 157, 255, 0.3);
+}
+.save-pill.cloud-err {
+  color: var(--bad);
+  background: rgba(255, 107, 107, 0.1);
+  border-color: rgba(255, 107, 107, 0.35);
+}
+.details-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+.details-hint summary {
+  cursor: pointer;
+  color: var(--info);
+  font-weight: 600;
+}
+.details-hint ol {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+.details-hint li { margin: 0.25rem 0; }
