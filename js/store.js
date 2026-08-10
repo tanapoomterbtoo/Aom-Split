@@ -1,14 +1,29 @@
 /**
- * Aom Split — localStorage + optional Google Sheet (Apps Script) sync
- * Build: 20260810a
+ * Aom Split — localStorage + Google Sheet (Apps Script) shared DB
+ * Build: 20260810b
+ *
+ * กลุ่มเพื่อนใช้ Sheet ชุดเดียวกันอัตโนมัติ (ไม่ต้องใส่ URL/token เอง)
  */
 (function (global) {
   const KEY = "aom_split_v1";
   const META_KEY = "aom_split_meta_v1";
   const REMOTE_KEY = "aom_split_remote_v1";
 
+  /** Shared group backend — everyone uses this Sheet */
+  const BUILTIN_REMOTE = {
+    enabled: true,
+    webAppUrl:
+      "https://script.google.com/macros/s/AKfycbwy3w8vDXn7AYkcrFop6YM4VatktJ6v4fyMpo31EbKWE0kGlklzBjxLKRX5fDPCQC9HBw/exec",
+    token: "aom_xcShnHEgQc2tZw7J",
+  };
+
   var pushTimer = null;
-  var lastRemoteStatus = { ok: null, at: null, message: "", mode: "local" };
+  var lastRemoteStatus = {
+    ok: null,
+    at: null,
+    message: "พร้อมซิงก์กลุ่ม",
+    mode: "cloud",
+  };
   var syncInFlight = null;
 
   function uid(prefix) {
@@ -322,40 +337,63 @@
   }
 
   function getRemoteConfig() {
+    // Always the shared group Sheet (built-in). Optional local override only if
+    // someone saved a full custom config with webAppUrl + token.
     try {
       const raw = localStorage.getItem(REMOTE_KEY);
-      if (!raw) {
-        return { enabled: false, webAppUrl: "", token: "" };
+      if (raw) {
+        const o = JSON.parse(raw);
+        // Explicit offline / local-only
+        if (o && o.enabled === false && o.forceLocal === true) {
+          return { enabled: false, webAppUrl: "", token: "" };
+        }
+        // Custom backend only when both URL and token provided
+        if (o && o.webAppUrl && o.token && o.useCustom === true) {
+          return {
+            enabled: o.enabled !== false,
+            webAppUrl: normalizeRemoteUrl(o.webAppUrl),
+            token: String(o.token || "").trim(),
+          };
+        }
       }
-      const o = JSON.parse(raw);
-      return {
-        enabled: !!o.enabled,
-        webAppUrl: normalizeRemoteUrl(o.webAppUrl),
-        token: String(o.token || "").trim(),
-      };
     } catch (e) {
-      return { enabled: false, webAppUrl: "", token: "" };
+      /* use builtin */
     }
+    return {
+      enabled: true,
+      webAppUrl: BUILTIN_REMOTE.webAppUrl,
+      token: BUILTIN_REMOTE.token,
+    };
   }
 
   function setRemoteConfig(cfg) {
     cfg = cfg || {};
-    const next = {
-      enabled: !!cfg.enabled,
-      webAppUrl: normalizeRemoteUrl(cfg.webAppUrl),
-      token: String(cfg.token || "").trim(),
-    };
+    var next;
+    if (cfg.forceLocal === true || cfg.enabled === false) {
+      next = { enabled: false, forceLocal: true, webAppUrl: "", token: "" };
+    } else if (cfg.useCustom === true && cfg.webAppUrl && cfg.token) {
+      next = {
+        enabled: true,
+        useCustom: true,
+        webAppUrl: normalizeRemoteUrl(cfg.webAppUrl),
+        token: String(cfg.token || "").trim(),
+      };
+    } else {
+      // reset to built-in shared group
+      next = { enabled: true, useBuiltin: true };
+    }
     if (!isStorageAvailable()) {
       throw new Error("บันทึกการตั้งค่าไม่ได้");
     }
     localStorage.setItem(REMOTE_KEY, JSON.stringify(next));
-    if (next.enabled && next.webAppUrl) {
-      setRemoteStatus({ mode: "cloud", message: "เชื่อม Google Sheet แล้ว", ok: null });
+    var active = getRemoteConfig();
+    if (active.enabled && active.webAppUrl) {
+      setRemoteStatus({ mode: "cloud", message: "เชื่อม Google Sheet กลุ่มแล้ว", ok: null });
     } else {
       setRemoteStatus({ mode: "local", message: "ใช้เฉพาะเครื่องนี้", ok: true });
     }
-    emit("aom-split-remote-config", next);
-    return next;
+    emit("aom-split-remote-config", active);
+    return active;
   }
 
   function getRemoteStatus() {
@@ -365,6 +403,14 @@
   function isRemoteEnabled() {
     var c = getRemoteConfig();
     return !!(c.enabled && c.webAppUrl && c.token);
+  }
+
+  function getBuiltinRemote() {
+    return {
+      enabled: BUILTIN_REMOTE.enabled,
+      webAppUrl: BUILTIN_REMOTE.webAppUrl,
+      token: BUILTIN_REMOTE.token,
+    };
   }
 
   /**
@@ -607,10 +653,10 @@
       });
   }
 
-  // init status
+  // init status — built-in cloud on by default
   try {
     if (isRemoteEnabled()) {
-      setRemoteStatus({ mode: "cloud", message: "พร้อมซิงก์ Google Sheet", ok: null });
+      setRemoteStatus({ mode: "cloud", message: "DB กลุ่ม (Google Sheet) พร้อมใช้", ok: null });
     } else {
       setRemoteStatus({ mode: "local", message: "ใช้เฉพาะเครื่องนี้", ok: true });
     }
@@ -621,6 +667,7 @@
   global.AomStore = {
     KEY: KEY,
     REMOTE_KEY: REMOTE_KEY,
+    BUILTIN_REMOTE: BUILTIN_REMOTE,
     uid: uid,
     load: load,
     save: save,
@@ -645,6 +692,7 @@
     setRemoteConfig: setRemoteConfig,
     getRemoteStatus: getRemoteStatus,
     isRemoteEnabled: isRemoteEnabled,
+    getBuiltinRemote: getBuiltinRemote,
     remoteRequest: remoteRequest,
     pullFromRemote: pullFromRemote,
     pushAllToRemote: pushAllToRemote,
