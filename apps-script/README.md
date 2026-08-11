@@ -75,8 +75,13 @@ Token: aom_xxxxxxxx
 ## ข้อจำกัด
 
 - แก้พร้อมกันหลายคน: **ใครบันทึกล่าสุดชนะ** (`updatedAt`)
-- ช้ากว่า local เล็กน้อย (รอบ Apps Script ~1–3 วินาที)
+- Apps Script ช้ากว่า DB จริง — แอปจึง **push เฉพาะทริปที่เปลี่ยน** + `upsert_many` (ครั้งเดียว)
 - เครื่องยังเก็บ cache ใน `localStorage` — ออฟไลน์ยังดู/แก้ได้ แล้วค่อยซิงก์เมื่อมีเน็ต
+
+## หลังแก้ Code.gs ต้อง redeploy
+
+**Deploy → Manage deployments → ✏️ → Version: New version → Deploy**  
+ไม่งั้น action ใหม่ (`upsert_many`) จะยังไม่มี
 
 ## API ย่อ (POST JSON, Content-Type: text/plain)
 
@@ -86,5 +91,6 @@ Token: aom_xxxxxxxx
 | `list` | `{ token }` | รายการทริปทั้งหมด |
 | `get` | `{ token, id }` | ทริปเดียว |
 | `upsert` | `{ token, session }` | บันทึกทริป |
+| `upsert_many` | `{ token, sessions: [] }` | บันทึกหลายทริปใน request เดียว (เร็ว) |
 | `delete` | `{ token, id }` | soft-delete |
 | `replace_all` | `{ token, sessions: [] }` | แทนทั้งชุด |

@@ -101,6 +101,15 @@ function handleRequest_(e, body) {
       var saved = upsertSession_(ss, session);
       return json_({ ok: true, session: saved });
     }
+    // บันทึกหลายทริปใน request เดียว (เร็วกว่า upsert ทีละอันมาก)
+    if (action === "upsert_many" || action === "bulk_upsert") {
+      var many = body.sessions;
+      if (!Array.isArray(many)) {
+        return json_({ ok: false, error: "missing_sessions" });
+      }
+      var bulk = upsertMany_(ss, many);
+      return json_({ ok: true, count: bulk.count, saved: bulk.count });
+    }
     if (action === "delete") {
       var delId = String(body.id || params.id || "");
       if (!delId) return json_({ ok: false, error: "missing_id" });
@@ -264,6 +273,60 @@ function upsertSession_(ss, session) {
     sh.appendRow(rowData);
   }
   return session;
+}
+
+/**
+ * บันทึกหลาย session ในครั้งเดียว
+ * - อ่าน id→row map ครั้งเดียว
+ * - update ทีละแถวที่เจอ / append แถวใหม่ทั้งก้อน
+ */
+function upsertMany_(ss, sessions) {
+  var sh = ensureSessionsSheet_(ss);
+  var last = sh.getLastRow();
+  var idToRow = {};
+  if (last >= 2) {
+    var idVals = sh.getRange(2, 1, last, 1).getValues();
+    for (var i = 0; i < idVals.length; i++) {
+      var rid = String(idVals[i][0] || "");
+      if (rid) idToRow[rid] = i + 2;
+    }
+  }
+
+  var appends = [];
+  var count = 0;
+  // ถ้า id ซ้ำใน batch เดียวกัน ใช้ตัวท้ายสุด
+  var byId = {};
+  for (var j = 0; j < sessions.length; j++) {
+    var raw = sessions[j];
+    if (!raw || !raw.id) continue;
+    byId[String(raw.id)] = raw;
+  }
+  var ids = Object.keys(byId);
+  for (var k = 0; k < ids.length; k++) {
+    var session = byId[ids[k]];
+    try {
+      session = JSON.parse(JSON.stringify(session));
+    } catch (e) {
+      continue;
+    }
+    session.updatedAt = Number(session.updatedAt) || Date.now();
+    if (!session.createdAt) session.createdAt = session.updatedAt;
+    var payload = JSON.stringify(session);
+    var rowData = [session.id, session.updatedAt, false, payload];
+    var row = idToRow[session.id];
+    if (row && row > 0) {
+      sh.getRange(row, 1, 1, 4).setValues([rowData]);
+    } else {
+      appends.push(rowData);
+    }
+    count++;
+  }
+
+  if (appends.length) {
+    var start = sh.getLastRow() + 1;
+    sh.getRange(start, 1, start + appends.length - 1, 4).setValues(appends);
+  }
+  return { count: count };
 }
 
 function deleteSession_(ss, id) {

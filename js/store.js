@@ -1,9 +1,9 @@
 /**
  * Aom Split — localStorage + Google Sheet (Apps Script) shared DB
- * Build: 20260810c
+ * Build: 20260811sync
  *
  * กลุ่มเพื่อนใช้ Sheet ชุดเดียวกันอัตโนมัติ (ไม่ต้องใส่ URL/token เอง)
- * ซิงก์อัตโนมัติ: ตอนบันทึก + ดึงรอบ ๆ ทุก 12 วินาที + ตอนกลับมาที่แท็บ
+ * ซิงก์เร็วขึ้น: push เฉพาะทริปที่เปลี่ยน · bulk upsert · ดึง ~3.5 วิ
  */
 (function (global) {
   const KEY = "aom_split_v1";
@@ -18,8 +18,10 @@
     token: "aom_xcShnHEgQc2tZw7J",
   };
 
-  /** ดึงของเพื่อนอัตโนมัติ (มิลลิวินาที) */
-  const AUTO_PULL_MS = 12000;
+  /** ดึงของเพื่อนอัตโนมัติตอนแท็บเปิด (มิลลิวินาที) */
+  const AUTO_PULL_MS = 3500;
+  /** รอรวมแก้รัวๆ ก่อนอัป Sheet */
+  const PUSH_DEBOUNCE_MS = 180;
 
   var pushTimer = null;
   var lastRemoteStatus = {
@@ -29,9 +31,17 @@
     mode: "cloud",
   };
   var syncInFlight = null;
+  var pushInFlight = null;
+  var pendingPushAfterPull = false;
   var autoPullTimer = null;
   var autoSyncBound = false;
   var lastPullFingerprint = "";
+  /** sessionId → true — อัปเฉพาะทริปที่แก้ (ไม่ยิงทุกทริป) */
+  var dirtySessionIds = Object.create(null);
+  var lastPullAt = 0;
+  var lastPushAt = 0;
+  /** null=ยังไม่รู้, true/false = backend รองรับ upsert_many หรือไม่ */
+  var bulkUpsertSupported = null;
 
   function uid(prefix) {
     return (
@@ -107,7 +117,8 @@
     emit("aom-split-remote", lastRemoteStatus);
   }
 
-  function save(data) {
+  function save(data, opts) {
+    opts = opts || {};
     if (!isStorageAvailable()) {
       writeMeta(false, "localStorage unavailable");
       const err = new Error("เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้ (โหมดส่วนตัวหรือปิด storage)");
@@ -123,7 +134,9 @@
         at: data.savedAt,
         count: (data.sessions || []).length,
       });
-      scheduleRemotePush();
+      if (!opts.skipRemotePush) {
+        scheduleRemotePush();
+      }
       return true;
     } catch (e) {
       writeMeta(false, String(e && e.message));
@@ -148,6 +161,22 @@
     });
   }
 
+  function markSessionDirty(id) {
+    if (id) dirtySessionIds[id] = true;
+  }
+
+  function takeDirtySessionIds() {
+    var ids = Object.keys(dirtySessionIds);
+    dirtySessionIds = Object.create(null);
+    return ids;
+  }
+
+  function redirtySessionIds(ids) {
+    (ids || []).forEach(function (id) {
+      if (id) dirtySessionIds[id] = true;
+    });
+  }
+
   function upsertSession(session) {
     const data = load();
     session.updatedAt = Date.now();
@@ -159,6 +188,7 @@
       session.createdAt = session.createdAt || Date.now();
       data.sessions.push(session);
     }
+    markSessionDirty(session.id);
     save(data);
     return session;
   }
@@ -168,17 +198,28 @@
     data.sessions = data.sessions.filter(function (s) {
       return s.id !== id;
     });
-    save(data);
+    // ไม่ mark dirty upsert — ลบตรงบน Sheet ทันที
+    delete dirtySessionIds[id];
+    save(data, { skipRemotePush: true });
     // push delete to sheet immediately when remote on
     var cfg = getRemoteConfig();
     if (cfg.enabled && cfg.webAppUrl) {
-      remoteRequest("delete", { id: id }).catch(function (err) {
-        setRemoteStatus({
-          ok: false,
-          mode: "cloud",
-          message: (err && err.message) || "ลบบน Sheet ไม่สำเร็จ",
+      remoteRequest("delete", { id: id }, { quiet: false })
+        .then(function () {
+          lastPushAt = Date.now();
+          setRemoteStatus({
+            ok: true,
+            mode: "cloud",
+            message: "ลบทริปบนกลุ่มแล้ว · " + formatClock(),
+          });
+        })
+        .catch(function (err) {
+          setRemoteStatus({
+            ok: false,
+            mode: "cloud",
+            message: (err && err.message) || "ลบบน Sheet ไม่สำเร็จ",
+          });
         });
-      });
     }
   }
 
@@ -293,6 +334,10 @@
         return map[k];
       });
     }
+    // import ทั้งชุด — ต้องอัปทุกทริป
+    (data.sessions || []).forEach(function (s) {
+      if (s && s.id) markSessionDirty(s.id);
+    });
     save(data);
     return data.sessions.length;
   }
@@ -557,48 +602,248 @@
     if (!isRemoteEnabled()) return;
     clearTimeout(pushTimer);
     pushTimer = setTimeout(function () {
-      pushAllToRemote().catch(function () {
+      flushDirtyPush().catch(function () {
         /* status already set */
       });
-    }, 700);
+    }, PUSH_DEBOUNCE_MS);
   }
 
-  /** Push every local session (and rely on soft-delete for removed ones via deleteSession) */
-  function pushAllToRemote() {
+  /**
+   * อัปโหลดรายการทริป (bulk ครั้งเดียว ถ้า backend รองรับ; fallback ทีละอัน)
+   * @param {object[]} sessions
+   * @param {{quiet?: boolean}} [opts]
+   */
+  function pushSessions(sessions, opts) {
+    opts = opts || {};
+    if (!isRemoteEnabled()) {
+      return Promise.resolve({ skipped: true, count: 0 });
+    }
+    sessions = (sessions || []).filter(function (s) {
+      return s && s.id;
+    });
+    if (!sessions.length) {
+      return Promise.resolve({ count: 0 });
+    }
+
+    var quiet = !!opts.quiet;
+    var ids = sessions.map(function (s) {
+      return s.id;
+    });
+
+    function pushSequential() {
+      var chain = Promise.resolve();
+      var count = 0;
+      sessions.forEach(function (s) {
+        chain = chain.then(function () {
+          return remoteRequest("upsert", { session: s }, { quiet: true }).then(
+            function () {
+              count++;
+            }
+          );
+        });
+      });
+      return chain.then(function () {
+        lastPushAt = Date.now();
+        if (!quiet) {
+          setRemoteStatus({
+            ok: true,
+            mode: "cloud",
+            message: "อัปแล้ว " + count + " ทริป · " + formatClock(),
+          });
+        }
+        return { count: count, mode: "sequential" };
+      });
+    }
+
+    function pushSingle() {
+      return remoteRequest(
+        "upsert",
+        { session: sessions[0] },
+        { quiet: quiet }
+      ).then(function () {
+        lastPushAt = Date.now();
+        return { count: 1, mode: "single" };
+      });
+    }
+
+    // รู้แล้วว่า backend เก่า — ไม่ลอง bulk ซ้ำ
+    if (bulkUpsertSupported === false) {
+      return (sessions.length === 1 ? pushSingle() : pushSequential()).catch(
+        function (err) {
+          redirtySessionIds(ids);
+          throw err;
+        }
+      );
+    }
+
+    // 1 request สำหรับหลายทริป (ต้อง deploy Code.gs ที่มี upsert_many)
+    // แม้ 1 ทริป ก็ใช้ bulk ได้ (เร็วพอๆ กัน + เส้นทางเดียว)
+    return remoteRequest(
+      "upsert_many",
+      { sessions: sessions },
+      { quiet: true }
+    )
+      .then(function (data) {
+        bulkUpsertSupported = true;
+        lastPushAt = Date.now();
+        var count =
+          (data && (data.count || data.saved)) || sessions.length;
+        if (!quiet) {
+          setRemoteStatus({
+            ok: true,
+            mode: "cloud",
+            message:
+              "อัปแล้ว " +
+              count +
+              " ทริป · " +
+              formatClock(),
+          });
+        }
+        return { count: count, mode: "bulk" };
+      })
+      .catch(function (err) {
+        var code = err && err.code;
+        var msg = (err && err.message) || "";
+        var isUnknown =
+          code === "unknown_action" ||
+          /unknown_action/i.test(msg) ||
+          /unknown action/i.test(msg);
+
+        if (isUnknown) {
+          bulkUpsertSupported = false;
+        }
+
+        // network / auth ฯลฯ — ถ้า 1 ทริป ลอง upsert เดี่ยว; หลายทริปลอง sequential
+        if (isUnknown || code !== "unauthorized") {
+          return (sessions.length === 1 ? pushSingle() : pushSequential()).catch(
+            function (err2) {
+              redirtySessionIds(ids);
+              throw err2;
+            }
+          );
+        }
+
+        redirtySessionIds(ids);
+        throw err;
+      });
+  }
+
+  /**
+   * อัปเฉพาะทริปที่ dirty — ไม่ยิงทุกทริปในเครื่อง
+   */
+  function flushDirtyPush(opts) {
+    opts = opts || {};
+    if (!isRemoteEnabled()) {
+      return Promise.resolve({ skipped: true, count: 0 });
+    }
+
+    // รอ pull จบก่อน กันเขียนทับกัน
+    if (syncInFlight) {
+      pendingPushAfterPull = true;
+      return syncInFlight
+        .catch(function () {
+          /* ignore pull err */
+        })
+        .then(function () {
+          pendingPushAfterPull = false;
+          return flushDirtyPush(opts);
+        });
+    }
+
+    if (pushInFlight) {
+      pendingPushAfterPull = true;
+      return pushInFlight.then(function () {
+        if (pendingPushAfterPull || Object.keys(dirtySessionIds).length) {
+          pendingPushAfterPull = false;
+          return flushDirtyPush(opts);
+        }
+        return { count: 0 };
+      });
+    }
+
+    var ids = takeDirtySessionIds();
+    if (!ids.length) {
+      return Promise.resolve({ count: 0 });
+    }
+
+    var idSet = {};
+    ids.forEach(function (id) {
+      idSet[id] = true;
+    });
+    var sessions = (load().sessions || []).filter(function (s) {
+      return s && idSet[s.id];
+    });
+
+    // ทริปถูกลบไปแล้วระหว่าง dirty — ข้าม
+    if (!sessions.length) {
+      return Promise.resolve({ count: 0 });
+    }
+
+    if (!opts.quiet) {
+      setRemoteStatus({
+        ok: null,
+        mode: "cloud",
+        message:
+          sessions.length === 1
+            ? "กำลังอัปทริป…"
+            : "กำลังอัป " + sessions.length + " ทริป…",
+      });
+    }
+
+    pushInFlight = pushSessions(sessions, { quiet: !!opts.quiet })
+      .then(function (result) {
+        if (!opts.quiet) {
+          setRemoteStatus({
+            ok: true,
+            mode: "cloud",
+            message:
+              "อัปกลุ่มแล้ว · " +
+              (result.count || sessions.length) +
+              " · " +
+              formatClock(),
+          });
+        } else {
+          setRemoteStatus({
+            ok: true,
+            mode: "cloud",
+            message: "ซิงก์อัตโนมัติ · " + formatClock(),
+          });
+        }
+        return result;
+      })
+      .finally(function () {
+        pushInFlight = null;
+      });
+
+    return pushInFlight;
+  }
+
+  /** Push every local session (import / full resync) */
+  function pushAllToRemote(opts) {
+    opts = opts || {};
     if (!isRemoteEnabled()) {
       return Promise.resolve({ skipped: true });
     }
     var sessions = load().sessions || [];
-    // sequential upserts to reduce Apps Script race on same sheet
-    var chain = Promise.resolve();
-    var count = 0;
     sessions.forEach(function (s) {
-      chain = chain.then(function () {
-        return remoteRequest("upsert", { session: s }).then(function () {
-          count++;
-        });
-      });
+      if (s && s.id) markSessionDirty(s.id);
     });
-    return chain.then(function () {
-      setRemoteStatus({
-        ok: true,
-        mode: "cloud",
-        message: "อัปโหลด " + count + " ทริปขึ้น Sheet แล้ว",
-      });
-      return { count: count };
-    });
+    return flushDirtyPush({ quiet: !!opts.quiet });
   }
 
   function pushSessionToRemote(session) {
     if (!isRemoteEnabled() || !session) {
       return Promise.resolve({ skipped: true });
     }
-    return remoteRequest("upsert", { session: session });
+    markSessionDirty(session.id);
+    // ดันคิวทันที (รวมกับ dirty อื่นถ้ามี) — ไม่รอ debounce
+    clearTimeout(pushTimer);
+    return flushDirtyPush({ quiet: false });
   }
 
   /**
    * Pull from Sheet and merge into localStorage.
-   * @param {{quiet?: boolean}} [opts]
+   * @param {{quiet?: boolean, force?: boolean}} [opts]
    * @returns {Promise<{count:number, merged:number, changed:boolean}>}
    */
   function pullFromRemote(opts) {
@@ -608,8 +853,20 @@
     }
     if (syncInFlight) return syncInFlight;
 
+    // กันยิง list ถี่เกิน (focus + interval ซ้อน)
+    var now = Date.now();
+    if (!opts.force && lastPullAt && now - lastPullAt < 1200) {
+      return Promise.resolve({
+        skipped: true,
+        count: 0,
+        changed: false,
+        throttled: true,
+      });
+    }
+
     syncInFlight = remoteRequest("list", {}, { quiet: !!opts.quiet })
       .then(function (data) {
+        lastPullAt = Date.now();
         var remoteSessions = (data && data.sessions) || [];
         var deletedIds = (data && data.deletedIds) || [];
         var local = load();
@@ -627,6 +884,19 @@
         localStorage.setItem(KEY, JSON.stringify(local));
         writeMeta(true, null);
         lastPullFingerprint = afterFp;
+
+        // หลัง merge: ถ้า local ใหม่กว่า remote อยู่ ต้อง push กลับ
+        var remoteTime = {};
+        remoteSessions.forEach(function (s) {
+          if (s && s.id) remoteTime[s.id] = sessionTime(s);
+        });
+        (merged || []).forEach(function (s) {
+          if (!s || !s.id) return;
+          var rt = remoteTime[s.id];
+          if (rt == null || sessionTime(s) > rt) {
+            markSessionDirty(s.id);
+          }
+        });
 
         emit("aom-split-pulled", {
           at: local.savedAt,
@@ -655,17 +925,23 @@
           count: remoteSessions.length,
           merged: merged.length,
           changed: changed,
+          remoteSessions: remoteSessions,
         };
       })
       .finally(function () {
         syncInFlight = null;
+        if (pendingPushAfterPull || Object.keys(dirtySessionIds).length) {
+          pendingPushAfterPull = false;
+          // เงียบ — ไม่กระพริบ UI ทุก auto cycle
+          flushDirtyPush({ quiet: true }).catch(function () {});
+        }
       });
 
     return syncInFlight;
   }
 
   /**
-   * Full sync: pull merge, then push local-only newer rows.
+   * Full sync: pull merge, then push only local-newer / dirty rows.
    * @param {{quiet?: boolean}} [opts]
    */
   function syncNow(opts) {
@@ -673,15 +949,19 @@
     if (!isRemoteEnabled()) {
       return Promise.reject(new Error("ยังไม่ได้เชื่อม Google Sheet"));
     }
-    return pullFromRemote({ quiet: !!opts.quiet }).then(function (pullResult) {
-      return pushAllToRemote().then(function (pushResult) {
+    return pullFromRemote({ quiet: !!opts.quiet, force: true }).then(function (
+      pullResult
+    ) {
+      return flushDirtyPush({ quiet: !!opts.quiet }).then(function (pushResult) {
         setRemoteStatus({
           ok: true,
           mode: "cloud",
           message:
-            "ซิงก์ครบแล้ว · " +
+            "ซิงก์ครบ · ดึง " +
             (pullResult.count || 0) +
-            " ทริป · " +
+            " · อัป " +
+            ((pushResult && pushResult.count) || 0) +
+            " · " +
             formatClock(),
         });
         return { pull: pullResult, push: pushResult };
@@ -697,11 +977,16 @@
     }
   }
 
-  /** ดึงอัตโนมัติ (เงียบ) — ข้ามถ้าแท็บซ่อนหรือกำลังซิงก์อยู่ */
+  /** ดึงอัตโนมัติ (เงียบ) — ข้ามถ้าแท็บซ่อน / กำลังซิงก์ / เพิ่ง push */
   function autoPullTick() {
     if (!isRemoteEnabled()) return;
     if (isDocumentHidden()) return;
-    if (syncInFlight) return;
+    if (syncInFlight || pushInFlight) return;
+    // ถ้ายังมี dirty รอ push อยู่ ให้ flush ก่อน แล้วค่อยดึงรอบถัดไป
+    if (Object.keys(dirtySessionIds).length) {
+      flushDirtyPush({ quiet: true }).catch(function () {});
+      return;
+    }
     pullFromRemote({ quiet: true }).catch(function () {
       /* status set */
     });
@@ -718,12 +1003,16 @@
       clearInterval(autoPullTimer);
     }
     autoPullTimer = setInterval(autoPullTick, AUTO_PULL_MS);
+    // ดึงรอบแรกเร็ว (ไม่รอครบ interval)
+    setTimeout(function () {
+      autoPullTick();
+    }, 400);
 
     if (!autoSyncBound && typeof document !== "undefined") {
       autoSyncBound = true;
       document.addEventListener("visibilitychange", function () {
         if (!document.hidden && isRemoteEnabled()) {
-          pullFromRemote({ quiet: true }).catch(function () {});
+          pullFromRemote({ quiet: true, force: true }).catch(function () {});
         }
       });
       try {
@@ -732,6 +1021,7 @@
             syncNow({ quiet: true }).catch(function () {});
           }
         });
+        // focus: throttle ผ่าน pullFromRemote เอง
         global.addEventListener("focus", function () {
           if (isRemoteEnabled() && !isDocumentHidden()) {
             pullFromRemote({ quiet: true }).catch(function () {});
