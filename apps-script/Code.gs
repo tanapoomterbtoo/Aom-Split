@@ -1,21 +1,24 @@
 /**
- * Aom Split — Google Sheets backend (ใช้เป็น DB แชร์กับเพื่อน)
+ * Aom Split — Google Sheets backend (fast path)
  *
  * Setup ย่อ:
  * 1) สร้าง Google Sheet ว่าง → Extensions → Apps Script → วางไฟล์นี้ทั้งก้อน
- * 2) รันฟังก์ชัน setupOnce() หนึ่งครั้ง (อนุญาตสิทธิ์) — สร้างชีต + ตั้ง token
+ * 2) รันฟังก์ชัน setupOnce() หนึ่งครั้ง (อนุญาตสิทธิ์)
  * 3) Deploy → New deployment → Type: Web app
  *    - Execute as: Me
  *    - Who has access: Anyone
- * 4) คัดลอก Web App URL + token ไปใส่ในแอป Aom Split (ทุกคนในกลุ่มใช้ชุดเดียวกัน)
+ * 4) แก้โค้ดทีหลัง: Deploy → Manage deployments → ✏️ → New version → Deploy
  *
  * ชีต Sessions: id | updatedAt | deleted | payload
- * token เก็บใน Script Properties คีย์ AOM_TOKEN (หรือชีต Config เซลล์ B1)
+ * เร่งความเร็ว: rev counter + CacheService + upsert_many
  */
 
 var SESSIONS_SHEET = "Sessions";
 var CONFIG_SHEET = "Config";
 var TOKEN_PROP = "AOM_TOKEN";
+var REV_PROP = "AOM_REV";
+var CACHE_LIST = "AOM_LIST_JSON";
+var CACHE_REV = "AOM_REV_CACHE";
 var APP_NAME = "Aom Split";
 
 function setupOnce() {
@@ -29,6 +32,9 @@ function setupOnce() {
     PropertiesService.getScriptProperties().setProperty(TOKEN_PROP, token);
   }
   writeConfigToken_(ss, token);
+  if (!PropertiesService.getScriptProperties().getProperty(REV_PROP)) {
+    PropertiesService.getScriptProperties().setProperty(REV_PROP, "1");
+  }
 
   Logger.log("Aom Split setup OK");
   Logger.log("Token (ใส่ในแอป + ส่งให้เพื่อน): " + token);
@@ -60,13 +66,13 @@ function handleRequest_(e, body) {
 
   try {
     if (action === "ping") {
-      // ping ไม่บังคับ token เพื่อเช็กว่า deploy แล้ว
       return json_({
         ok: true,
         app: APP_NAME,
         action: "ping",
         authRequired: true,
         time: new Date().toISOString(),
+        rev: getRev_(),
       });
     }
 
@@ -74,15 +80,33 @@ function handleRequest_(e, body) {
       return json_({ ok: false, error: "unauthorized", message: "token ไม่ถูกต้อง" });
     }
 
+    // ── เบาที่สุด: เช็กว่ามีของใหม่ไหม (ไม่แตะชีตถ้า cache hit)
+    if (action === "rev" || action === "head" || action === "poll") {
+      return json_({
+        ok: true,
+        rev: getRev_(),
+        action: "rev",
+      });
+    }
+
+    // ── versions: id→updatedAt เบาๆ (fallback ถ้า client เก่า)
+    if (action === "versions") {
+      var ssV = SpreadsheetApp.getActiveSpreadsheet();
+      ensureSessionsSheet_(ssV);
+      return json_({
+        ok: true,
+        rev: getRev_(),
+        versions: listVersions_(ssV),
+        deletedIds: listDeletedIds_(ssV),
+      });
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSessionsSheet_(ss);
 
     if (action === "list") {
-      return json_({
-        ok: true,
-        sessions: listSessions_(ss, !!body.includeDeleted),
-        deletedIds: listDeletedIds_(ss),
-      });
+      var listPayload = listPayload_(ss, !!body.includeDeleted, !!body.nocache);
+      return json_(listPayload);
     }
     if (action === "get") {
       var id = String(body.id || params.id || "");
@@ -91,7 +115,7 @@ function handleRequest_(e, body) {
       if (!row || row.deleted) {
         return json_({ ok: false, error: "not_found" });
       }
-      return json_({ ok: true, session: row.session });
+      return json_({ ok: true, session: row.session, rev: getRev_() });
     }
     if (action === "upsert") {
       var session = body.session;
@@ -99,31 +123,33 @@ function handleRequest_(e, body) {
         return json_({ ok: false, error: "missing_session" });
       }
       var saved = upsertSession_(ss, session);
-      return json_({ ok: true, session: saved });
+      var revU = bumpRev_();
+      return json_({ ok: true, session: saved, rev: revU });
     }
-    // บันทึกหลายทริปใน request เดียว (เร็วกว่า upsert ทีละอันมาก)
     if (action === "upsert_many" || action === "bulk_upsert") {
       var many = body.sessions;
       if (!Array.isArray(many)) {
         return json_({ ok: false, error: "missing_sessions" });
       }
       var bulk = upsertMany_(ss, many);
-      return json_({ ok: true, count: bulk.count, saved: bulk.count });
+      var revB = bumpRev_();
+      return json_({ ok: true, count: bulk.count, saved: bulk.count, rev: revB });
     }
     if (action === "delete") {
       var delId = String(body.id || params.id || "");
       if (!delId) return json_({ ok: false, error: "missing_id" });
       deleteSession_(ss, delId);
-      return json_({ ok: true, id: delId });
+      var revD = bumpRev_();
+      return json_({ ok: true, id: delId, rev: revD });
     }
     if (action === "replace_all") {
-      // ใช้ตอน import ใหญ่ — แทนทั้งชุด (soft: ลบเก่าแล้วใส่ใหม่)
       var sessions = body.sessions;
       if (!Array.isArray(sessions)) {
         return json_({ ok: false, error: "missing_sessions" });
       }
       replaceAll_(ss, sessions);
-      return json_({ ok: true, count: sessions.length });
+      var revR = bumpRev_();
+      return json_({ ok: true, count: sessions.length, rev: revR });
     }
 
     return json_({ ok: false, error: "unknown_action", action: action });
@@ -134,6 +160,78 @@ function handleRequest_(e, body) {
       message: String(err && err.message ? err.message : err),
     });
   }
+}
+
+/* ───────── rev + cache ───────── */
+
+function getRev_() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var c = cache.get(CACHE_REV);
+    if (c != null && c !== "") return Number(c) || 0;
+  } catch (e0) {
+    /* ignore */
+  }
+  var rev = Number(
+    PropertiesService.getScriptProperties().getProperty(REV_PROP) || 0
+  );
+  try {
+    CacheService.getScriptCache().put(CACHE_REV, String(rev), 30);
+  } catch (e1) {
+    /* ignore */
+  }
+  return rev;
+}
+
+function bumpRev_() {
+  var p = PropertiesService.getScriptProperties();
+  var rev = Number(p.getProperty(REV_PROP) || 0) + 1;
+  p.setProperty(REV_PROP, String(rev));
+  try {
+    var cache = CacheService.getScriptCache();
+    cache.put(CACHE_REV, String(rev), 30);
+    cache.remove(CACHE_LIST);
+  } catch (e) {
+    /* ignore */
+  }
+  return rev;
+}
+
+function listPayload_(ss, includeDeleted, nocache) {
+  if (!includeDeleted && !nocache) {
+    try {
+      var cached = CacheService.getScriptCache().get(CACHE_LIST);
+      if (cached) {
+        var parsed = JSON.parse(cached);
+        // แน่ใจว่า rev ล่าสุด
+        parsed.rev = getRev_();
+        return parsed;
+      }
+    } catch (e) {
+      /* rebuild */
+    }
+  }
+
+  var payload = {
+    ok: true,
+    sessions: listSessions_(ss, includeDeleted),
+    deletedIds: listDeletedIds_(ss),
+    rev: getRev_(),
+  };
+
+  if (!includeDeleted) {
+    try {
+      // cache สั้นๆ — ลดอ่านชีตซ้ำตอนเพื่อนหลายคน poll
+      CacheService.getScriptCache().put(
+        CACHE_LIST,
+        JSON.stringify(payload),
+        8
+      );
+    } catch (e2) {
+      /* ignore size/quota */
+    }
+  }
+  return payload;
 }
 
 /* ───────── sheet helpers ───────── */
@@ -192,7 +290,6 @@ function checkToken_(token) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var cfg = readConfigToken_(ss);
     if (cfg && token === cfg) {
-      // sync prop for next time
       if (!prop) {
         PropertiesService.getScriptProperties().setProperty(TOKEN_PROP, cfg);
       }
@@ -219,6 +316,22 @@ function listSessions_(ss, includeDeleted) {
     if (!session) continue;
     if (!session.id) session.id = id;
     out.push(session);
+  }
+  return out;
+}
+
+/** เบา: อ่านแค่ id + updatedAt + deleted */
+function listVersions_(ss) {
+  var sh = ensureSessionsSheet_(ss);
+  var last = sh.getLastRow();
+  if (last < 2) return {};
+  var values = sh.getRange(2, 1, last, 3).getValues();
+  var out = {};
+  for (var i = 0; i < values.length; i++) {
+    var id = String(values[i][0] || "");
+    if (!id) continue;
+    if (toBool_(values[i][2])) continue;
+    out[id] = Number(values[i][1]) || 0;
   }
   return out;
 }
@@ -267,7 +380,6 @@ function upsertSession_(ss, session) {
   var rowData = [session.id, session.updatedAt, false, payload];
 
   if (found) {
-    // last-write-wins: รับเสมอ (client ควรส่ง updatedAt ล่าสุด)
     sh.getRange(found.row, 1, 1, 4).setValues([rowData]);
   } else {
     sh.appendRow(rowData);
@@ -275,11 +387,6 @@ function upsertSession_(ss, session) {
   return session;
 }
 
-/**
- * บันทึกหลาย session ในครั้งเดียว
- * - อ่าน id→row map ครั้งเดียว
- * - update ทีละแถวที่เจอ / append แถวใหม่ทั้งก้อน
- */
 function upsertMany_(ss, sessions) {
   var sh = ensureSessionsSheet_(ss);
   var last = sh.getLastRow();
@@ -294,7 +401,6 @@ function upsertMany_(ss, sessions) {
 
   var appends = [];
   var count = 0;
-  // ถ้า id ซ้ำใน batch เดียวกัน ใช้ตัวท้ายสุด
   var byId = {};
   for (var j = 0; j < sessions.length; j++) {
     var raw = sessions[j];
@@ -333,27 +439,27 @@ function deleteSession_(ss, id) {
   var sh = ensureSessionsSheet_(ss);
   var found = findSessionRow_(ss, id);
   if (!found) return;
-  // soft delete — เก็บประวัติในชีต
   sh.getRange(found.row, 3).setValue(true);
   sh.getRange(found.row, 2).setValue(Date.now());
 }
 
 function replaceAll_(ss, sessions) {
   var sh = ensureSessionsSheet_(ss);
-  // clear data rows
   var last = sh.getLastRow();
   if (last >= 2) {
     sh.getRange(2, 1, last, 4).clearContent();
   }
   if (!sessions.length) return;
-  var rows = sessions.map(function (s) {
-    s = s || {};
-    var id = s.id || "";
-    var updatedAt = Number(s.updatedAt) || Date.now();
-    return [id, updatedAt, false, JSON.stringify(s)];
-  }).filter(function (r) {
-    return !!r[0];
-  });
+  var rows = sessions
+    .map(function (s) {
+      s = s || {};
+      var id = s.id || "";
+      var updatedAt = Number(s.updatedAt) || Date.now();
+      return [id, updatedAt, false, JSON.stringify(s)];
+    })
+    .filter(function (r) {
+      return !!r[0];
+    });
   if (rows.length) {
     sh.getRange(2, 1, 1 + rows.length - 1, 4).setValues(rows);
   }

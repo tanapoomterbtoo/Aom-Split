@@ -78,19 +78,21 @@ Token: aom_xxxxxxxx
 - Apps Script ช้ากว่า DB จริง — แอปจึง **push เฉพาะทริปที่เปลี่ยน** + `upsert_many` (ครั้งเดียว)
 - เครื่องยังเก็บ cache ใน `localStorage` — ออฟไลน์ยังดู/แก้ได้ แล้วค่อยซิงก์เมื่อมีเน็ต
 
-## หลังแก้ Code.gs ต้อง redeploy
+## หลังแก้ Code.gs ต้อง redeploy (สำคัญมาก)
 
-**Deploy → Manage deployments → ✏️ → Version: New version → Deploy**  
-ไม่งั้น action ใหม่ (`upsert_many`) จะยังไม่มี
+**Deploy → Manage deployments → ✏️ → Version: New version → Deploy**
+
+ถ้าไม่ redeploy แอปจะ fallback โหมดช้า (ไม่มี `rev` / `upsert_many` / cache)
 
 ## API ย่อ (POST JSON, Content-Type: text/plain)
 
 | action | body | ผล |
 |--------|------|-----|
-| `ping` | `{}` | เช็กว่า deploy แล้ว (ไม่บังคับ token) |
-| `list` | `{ token }` | รายการทริปทั้งหมด |
+| `ping` | `{}` | เช็ก deploy (ไม่บังคับ token) + คืน `rev` |
+| `rev` | `{ token }` | **เบาที่สุด** — เลข revision อย่างเดียว (poll ทุก ~1.5 วิ) |
+| `list` | `{ token }` | รายการทริป (+ cache ~8 วิ ฝั่งเซิร์ฟเวอร์) |
 | `get` | `{ token, id }` | ทริปเดียว |
 | `upsert` | `{ token, session }` | บันทึกทริป |
-| `upsert_many` | `{ token, sessions: [] }` | บันทึกหลายทริปใน request เดียว (เร็ว) |
+| `upsert_many` | `{ token, sessions: [] }` | บันทึกหลายทริปครั้งเดียว |
 | `delete` | `{ token, id }` | soft-delete |
 | `replace_all` | `{ token, sessions: [] }` | แทนทั้งชุด |

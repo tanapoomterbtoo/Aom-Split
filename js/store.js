@@ -1,9 +1,12 @@
 /**
  * Aom Split — localStorage + Google Sheet (Apps Script) shared DB
- * Build: 20260811sync
+ * Build: 20260811fast
  *
- * กลุ่มเพื่อนใช้ Sheet ชุดเดียวกันอัตโนมัติ (ไม่ต้องใส่ URL/token เอง)
- * ซิงก์เร็วขึ้น: push เฉพาะทริปที่เปลี่ยน · bulk upsert · ดึง ~3.5 วิ
+ * เร็วสุดที่ทำได้บน GAS:
+ * - push ทันที (debounce 32ms รวมคีย์รัว)
+ * - ไม่รอ pull ก่อน push
+ * - poll rev เบาๆ ทุก 1.5 วิ → list เฉพาะเมื่อมีของใหม่
+ * - bulk upsert + cache ฝั่ง Sheet
  */
 (function (global) {
   const KEY = "aom_split_v1";
@@ -18,10 +21,10 @@
     token: "aom_xcShnHEgQc2tZw7J",
   };
 
-  /** ดึงของเพื่อนอัตโนมัติตอนแท็บเปิด (มิลลิวินาที) */
-  const AUTO_PULL_MS = 3500;
-  /** รอรวมแก้รัวๆ ก่อนอัป Sheet */
-  const PUSH_DEBOUNCE_MS = 180;
+  /** poll เบา (rev) ตอนแท็บเปิด */
+  const AUTO_PULL_MS = 1500;
+  /** รวมแก้รัวในเฟรมเดียวกัน */
+  const PUSH_DEBOUNCE_MS = 32;
 
   var pushTimer = null;
   var lastRemoteStatus = {
@@ -32,16 +35,18 @@
   };
   var syncInFlight = null;
   var pushInFlight = null;
-  var pendingPushAfterPull = false;
+  var pendingPushAfter = false;
   var autoPullTimer = null;
   var autoSyncBound = false;
   var lastPullFingerprint = "";
-  /** sessionId → true — อัปเฉพาะทริปที่แก้ (ไม่ยิงทุกทริป) */
+  /** sessionId → true — อัปเฉพาะทริปที่แก้ */
   var dirtySessionIds = Object.create(null);
   var lastPullAt = 0;
   var lastPushAt = 0;
-  /** null=ยังไม่รู้, true/false = backend รองรับ upsert_many หรือไม่ */
+  var lastRemoteRev = -1;
+  var revPollSupported = null; // null | true | false
   var bulkUpsertSupported = null;
+  var warmTimer = null;
 
   function uid(prefix) {
     return (
@@ -474,27 +479,28 @@
 
   /**
    * Call Apps Script web app.
-   * Content-Type text/plain avoids CORS preflight with Google Apps Script.
-   * @param {string} action
-   * @param {object} [extra]
-   * @param {{quiet?: boolean}} [opts] quiet=true ไม่กระพริบสถานะตอน auto-pull
+   * @param {{quiet?: boolean, silent?: boolean}} [opts]
+   *   quiet  = ไม่โชว์ "กำลังคุย…"
+   *   silent = ไม่แตะสถานะเลย (poll rev)
    */
   function remoteRequest(action, extra, opts) {
     opts = opts || {};
-    var quiet = !!opts.quiet;
+    var quiet = !!opts.quiet || !!opts.silent;
+    var silent = !!opts.silent;
     var cfg = getRemoteConfig();
     if (!cfg.webAppUrl) {
       return Promise.reject(new Error("ยังไม่ได้ใส่ Web App URL"));
     }
     var body = Object.assign({ action: action, token: cfg.token }, extra || {});
 
-    if (!quiet) {
-      setRemoteStatus({ mode: "cloud", message: "กำลังคุยกับ Google Sheet…", ok: null });
+    if (!quiet && !silent) {
+      setRemoteStatus({ mode: "cloud", message: "กำลังอัปกลุ่ม…", ok: null });
     }
 
     return fetch(cfg.webAppUrl, {
       method: "POST",
       redirect: "follow",
+      // keepalive ช่วยตอนปิดแท็บ — ปกติไม่กระทบ latency
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(body),
     })
@@ -523,33 +529,45 @@
             err.code = data.error;
             throw err;
           }
+          if (data && typeof data.rev === "number") {
+            lastRemoteRev = data.rev;
+          }
           return data;
         });
       })
       .then(function (data) {
+        if (silent) return data;
         if (!quiet) {
           setRemoteStatus({
             ok: true,
             mode: "cloud",
-            message: "ซิงก์ Google Sheet แล้ว",
+            message: "อัปกลุ่มแล้ว · " + formatClock(),
           });
         } else {
           setRemoteStatus({
             ok: true,
             mode: "cloud",
-            message: "ซิงก์อัตโนมัติ · " + formatClock(),
+            message: "ออนไลน์ · " + formatClock(),
           });
         }
         return data;
       })
       .catch(function (err) {
-        setRemoteStatus({
-          ok: false,
-          mode: "cloud",
-          message: (err && err.message) || "เชื่อม Sheet ไม่สำเร็จ",
-        });
+        if (!silent) {
+          setRemoteStatus({
+            ok: false,
+            mode: "cloud",
+            message: (err && err.message) || "เชื่อม Sheet ไม่สำเร็จ",
+          });
+        }
         throw err;
       });
+  }
+
+  function noteRevFromData(data) {
+    if (data && typeof data.rev === "number") {
+      lastRemoteRev = data.rev;
+    }
   }
 
   function formatClock() {
@@ -601,8 +619,9 @@
   function scheduleRemotePush() {
     if (!isRemoteEnabled()) return;
     clearTimeout(pushTimer);
+    // 32ms = รวมหลาย save ในเฟรมเดียว แล้วยิงทันที
     pushTimer = setTimeout(function () {
-      flushDirtyPush().catch(function () {
+      flushDirtyPush({ quiet: true }).catch(function () {
         /* status already set */
       });
     }, PUSH_DEBOUNCE_MS);
@@ -686,17 +705,15 @@
       .then(function (data) {
         bulkUpsertSupported = true;
         lastPushAt = Date.now();
+        noteRevFromData(data);
+        // เราเพิ่งอัป — ดึง list ซ้ำรอบถัดไปไม่จำเป็นจนกว่า rev จะขยับจากเครื่องอื่น
         var count =
           (data && (data.count || data.saved)) || sessions.length;
         if (!quiet) {
           setRemoteStatus({
             ok: true,
             mode: "cloud",
-            message:
-              "อัปแล้ว " +
-              count +
-              " ทริป · " +
-              formatClock(),
+            message: "อัปแล้ว · " + formatClock(),
           });
         }
         return { count: count, mode: "bulk" };
@@ -729,7 +746,7 @@
   }
 
   /**
-   * อัปเฉพาะทริปที่ dirty — ไม่ยิงทุกทริปในเครื่อง
+   * อัปเฉพาะทริปที่ dirty — ไม่รอ pull (LWW ที่ updatedAt)
    */
   function flushDirtyPush(opts) {
     opts = opts || {};
@@ -737,24 +754,12 @@
       return Promise.resolve({ skipped: true, count: 0 });
     }
 
-    // รอ pull จบก่อน กันเขียนทับกัน
-    if (syncInFlight) {
-      pendingPushAfterPull = true;
-      return syncInFlight
-        .catch(function () {
-          /* ignore pull err */
-        })
-        .then(function () {
-          pendingPushAfterPull = false;
-          return flushDirtyPush(opts);
-        });
-    }
-
+    // ถ้ากำลัง push อยู่ — ต่อคิวรอบถัดไป (รวม dirty ใหม่)
     if (pushInFlight) {
-      pendingPushAfterPull = true;
+      pendingPushAfter = true;
       return pushInFlight.then(function () {
-        if (pendingPushAfterPull || Object.keys(dirtySessionIds).length) {
-          pendingPushAfterPull = false;
+        if (pendingPushAfter || Object.keys(dirtySessionIds).length) {
+          pendingPushAfter = false;
           return flushDirtyPush(opts);
         }
         return { count: 0 };
@@ -774,7 +779,6 @@
       return s && idSet[s.id];
     });
 
-    // ทริปถูกลบไปแล้วระหว่าง dirty — ข้าม
     if (!sessions.length) {
       return Promise.resolve({ count: 0 });
     }
@@ -783,36 +787,25 @@
       setRemoteStatus({
         ok: null,
         mode: "cloud",
-        message:
-          sessions.length === 1
-            ? "กำลังอัปทริป…"
-            : "กำลังอัป " + sessions.length + " ทริป…",
+        message: "กำลังอัป…",
       });
     }
 
     pushInFlight = pushSessions(sessions, { quiet: !!opts.quiet })
       .then(function (result) {
-        if (!opts.quiet) {
-          setRemoteStatus({
-            ok: true,
-            mode: "cloud",
-            message:
-              "อัปกลุ่มแล้ว · " +
-              (result.count || sessions.length) +
-              " · " +
-              formatClock(),
-          });
-        } else {
-          setRemoteStatus({
-            ok: true,
-            mode: "cloud",
-            message: "ซิงก์อัตโนมัติ · " + formatClock(),
-          });
-        }
+        setRemoteStatus({
+          ok: true,
+          mode: "cloud",
+          message: "อัปแล้ว · " + formatClock(),
+        });
         return result;
       })
       .finally(function () {
         pushInFlight = null;
+        if (pendingPushAfter || Object.keys(dirtySessionIds).length) {
+          pendingPushAfter = false;
+          flushDirtyPush({ quiet: true }).catch(function () {});
+        }
       });
 
     return pushInFlight;
@@ -843,8 +836,7 @@
 
   /**
    * Pull from Sheet and merge into localStorage.
-   * @param {{quiet?: boolean, force?: boolean}} [opts]
-   * @returns {Promise<{count:number, merged:number, changed:boolean}>}
+   * @param {{quiet?: boolean, force?: boolean, silent?: boolean}} [opts]
    */
   function pullFromRemote(opts) {
     opts = opts || {};
@@ -853,9 +845,8 @@
     }
     if (syncInFlight) return syncInFlight;
 
-    // กันยิง list ถี่เกิน (focus + interval ซ้อน)
     var now = Date.now();
-    if (!opts.force && lastPullAt && now - lastPullAt < 1200) {
+    if (!opts.force && lastPullAt && now - lastPullAt < 800) {
       return Promise.resolve({
         skipped: true,
         count: 0,
@@ -864,9 +855,13 @@
       });
     }
 
-    syncInFlight = remoteRequest("list", {}, { quiet: !!opts.quiet })
+    syncInFlight = remoteRequest("list", {}, {
+      quiet: true,
+      silent: !!opts.silent,
+    })
       .then(function (data) {
         lastPullAt = Date.now();
+        noteRevFromData(data);
         var remoteSessions = (data && data.sessions) || [];
         var deletedIds = (data && data.deletedIds) || [];
         var local = load();
@@ -880,12 +875,10 @@
         }
         local.version = local.version || 1;
         local.savedAt = Date.now();
-        // write local only — do NOT schedule push (would thrash on every auto-pull)
         localStorage.setItem(KEY, JSON.stringify(local));
         writeMeta(true, null);
         lastPullFingerprint = afterFp;
 
-        // หลัง merge: ถ้า local ใหม่กว่า remote อยู่ ต้อง push กลับ
         var remoteTime = {};
         remoteSessions.forEach(function (s) {
           if (s && s.id) remoteTime[s.id] = sessionTime(s);
@@ -903,7 +896,7 @@
           count: remoteSessions.length,
           merged: merged.length,
           changed: changed,
-          quiet: !!opts.quiet,
+          quiet: true,
         });
 
         if (changed) {
@@ -912,15 +905,13 @@
             count: merged.length,
             source: "pull",
           });
+          setRemoteStatus({
+            ok: true,
+            mode: "cloud",
+            message: "มีอัปเดตจากกลุ่ม · " + formatClock(),
+          });
         }
 
-        setRemoteStatus({
-          ok: true,
-          mode: "cloud",
-          message: changed
-            ? "มีอัปเดตจากกลุ่ม · " + formatClock()
-            : "ซิงก์อัตโนมัติ · " + formatClock(),
-        });
         return {
           count: remoteSessions.length,
           merged: merged.length,
@@ -930,9 +921,7 @@
       })
       .finally(function () {
         syncInFlight = null;
-        if (pendingPushAfterPull || Object.keys(dirtySessionIds).length) {
-          pendingPushAfterPull = false;
-          // เงียบ — ไม่กระพริบ UI ทุก auto cycle
+        if (Object.keys(dirtySessionIds).length) {
           flushDirtyPush({ quiet: true }).catch(function () {});
         }
       });
@@ -941,30 +930,78 @@
   }
 
   /**
-   * Full sync: pull merge, then push only local-newer / dirty rows.
-   * @param {{quiet?: boolean}} [opts]
+   * เช็ก rev เบาๆ — ถ้าไม่เปลี่ยนไม่ list (ประหยัด 1–3 วิ)
    */
+  function pollRemoteRev() {
+    if (!isRemoteEnabled()) {
+      return Promise.resolve({ changed: false, skipped: true });
+    }
+    if (revPollSupported === false) {
+      return pullFromRemote({ quiet: true, silent: true });
+    }
+
+    return remoteRequest("rev", {}, { silent: true })
+      .then(function (data) {
+        revPollSupported = true;
+        var rev = data && typeof data.rev === "number" ? data.rev : null;
+        if (rev == null) {
+          return pullFromRemote({ quiet: true, force: true, silent: true });
+        }
+        if (lastRemoteRev >= 0 && rev === lastRemoteRev) {
+          // ไม่มีของใหม่
+          setRemoteStatus({
+            ok: true,
+            mode: "cloud",
+            message: "ออนไลน์ · " + formatClock(),
+          });
+          return { changed: false, rev: rev, skipped: true };
+        }
+        var prev = lastRemoteRev;
+        lastRemoteRev = rev;
+        // rev ขยับครั้งแรก (prev < 0) ก็ list รอบหนึ่ง
+        return pullFromRemote({ quiet: true, force: true, silent: true }).then(
+          function (r) {
+            return Object.assign({ rev: rev, was: prev }, r || {});
+          }
+        );
+      })
+      .catch(function (err) {
+        var code = err && err.code;
+        var msg = (err && err.message) || "";
+        if (
+          code === "unknown_action" ||
+          /unknown_action/i.test(msg)
+        ) {
+          revPollSupported = false;
+        }
+        // fallback: list เต็ม
+        return pullFromRemote({ quiet: true, silent: true });
+      });
+  }
+
   function syncNow(opts) {
     opts = opts || {};
     if (!isRemoteEnabled()) {
       return Promise.reject(new Error("ยังไม่ได้เชื่อม Google Sheet"));
     }
-    return pullFromRemote({ quiet: !!opts.quiet, force: true }).then(function (
-      pullResult
-    ) {
-      return flushDirtyPush({ quiet: !!opts.quiet }).then(function (pushResult) {
+    // push กับ pull พร้อมกัน — ไม่รอคิว
+    var pushP = flushDirtyPush({ quiet: !!opts.quiet });
+    var pullP = pullFromRemote({ quiet: !!opts.quiet, force: true });
+    return Promise.all([pullP, pushP]).then(function (pair) {
+      var pullResult = pair[0] || {};
+      var pushResult = pair[1] || {};
+      // ถ้า push ทำ dirty ใหม่ระหว่าง pull — รอบสองสั้นๆ
+      return flushDirtyPush({ quiet: true }).then(function (push2) {
         setRemoteStatus({
           ok: true,
           mode: "cloud",
-          message:
-            "ซิงก์ครบ · ดึง " +
-            (pullResult.count || 0) +
-            " · อัป " +
-            ((pushResult && pushResult.count) || 0) +
-            " · " +
-            formatClock(),
+          message: "ซิงก์ครบ · " + formatClock(),
         });
-        return { pull: pullResult, push: pushResult };
+        return {
+          pull: pullResult,
+          push: pushResult,
+          push2: push2,
+        };
       });
     });
   }
@@ -977,42 +1014,63 @@
     }
   }
 
-  /** ดึงอัตโนมัติ (เงียบ) — ข้ามถ้าแท็บซ่อน / กำลังซิงก์ / เพิ่ง push */
+  /** tick: push dirty ก่อน · แล้ว poll rev */
   function autoPullTick() {
     if (!isRemoteEnabled()) return;
     if (isDocumentHidden()) return;
-    if (syncInFlight || pushInFlight) return;
-    // ถ้ายังมี dirty รอ push อยู่ ให้ flush ก่อน แล้วค่อยดึงรอบถัดไป
+
     if (Object.keys(dirtySessionIds).length) {
       flushDirtyPush({ quiet: true }).catch(function () {});
-      return;
+      // ยัง poll rev ต่อได้คู่ขนาน ถ้าไม่ติด push/list หนัก
     }
-    pullFromRemote({ quiet: true }).catch(function () {
-      /* status set */
+
+    if (syncInFlight) return;
+    pollRemoteRev().catch(function () {
+      /* status */
     });
   }
 
-  /**
-   * เริ่มซิงก์อัตโนมัติ (idempotent)
-   * - ดึงรอบใหม่ทุก AUTO_PULL_MS ตอนแท็บเปิดอยู่
-   * - กลับมาที่แท็บ / เน็ตกลับมา → ดึงทันที
-   */
+  function warmConnection() {
+    if (!isRemoteEnabled()) return;
+    // อุ่น GAS ลด cold start รอบถัดไป
+    remoteRequest("rev", {}, { silent: true })
+      .then(function (data) {
+        revPollSupported = true;
+        noteRevFromData(data);
+      })
+      .catch(function () {
+        remoteRequest("ping", {}, { silent: true }).catch(function () {});
+      });
+  }
+
   function startAutoSync() {
     if (!isRemoteEnabled()) return false;
     if (autoPullTimer) {
       clearInterval(autoPullTimer);
     }
     autoPullTimer = setInterval(autoPullTick, AUTO_PULL_MS);
-    // ดึงรอบแรกเร็ว (ไม่รอครบ interval)
+
+    // อุ่น + ดึงรอบแรกทันที
+    warmConnection();
     setTimeout(function () {
       autoPullTick();
-    }, 400);
+    }, 120);
+
+    // อุ่นซ้ำทุก 45 วิ กัน cold start
+    if (warmTimer) clearInterval(warmTimer);
+    warmTimer = setInterval(function () {
+      if (!isDocumentHidden()) warmConnection();
+    }, 45000);
 
     if (!autoSyncBound && typeof document !== "undefined") {
       autoSyncBound = true;
       document.addEventListener("visibilitychange", function () {
         if (!document.hidden && isRemoteEnabled()) {
-          pullFromRemote({ quiet: true, force: true }).catch(function () {});
+          warmConnection();
+          pollRemoteRev().catch(function () {});
+          if (Object.keys(dirtySessionIds).length) {
+            flushDirtyPush({ quiet: true }).catch(function () {});
+          }
         }
       });
       try {
@@ -1021,10 +1079,9 @@
             syncNow({ quiet: true }).catch(function () {});
           }
         });
-        // focus: throttle ผ่าน pullFromRemote เอง
         global.addEventListener("focus", function () {
           if (isRemoteEnabled() && !isDocumentHidden()) {
-            pullFromRemote({ quiet: true }).catch(function () {});
+            pollRemoteRev().catch(function () {});
           }
         });
       } catch (e) {
@@ -1034,7 +1091,7 @@
     setRemoteStatus({
       ok: lastRemoteStatus.ok,
       mode: "cloud",
-      message: lastRemoteStatus.message || "ซิงก์อัตโนมัติเปิดอยู่",
+      message: lastRemoteStatus.message || "ซิงก์เร็วเปิดอยู่",
     });
     return true;
   }
@@ -1043,6 +1100,10 @@
     if (autoPullTimer) {
       clearInterval(autoPullTimer);
       autoPullTimer = null;
+    }
+    if (warmTimer) {
+      clearInterval(warmTimer);
+      warmTimer = null;
     }
   }
 
@@ -1138,5 +1199,7 @@
     startAutoSync: startAutoSync,
     stopAutoSync: stopAutoSync,
     AUTO_PULL_MS: AUTO_PULL_MS,
+    PUSH_DEBOUNCE_MS: PUSH_DEBOUNCE_MS,
+    pollRemoteRev: pollRemoteRev,
   };
 })(typeof window !== "undefined" ? window : globalThis);
