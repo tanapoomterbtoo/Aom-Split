@@ -15,6 +15,8 @@
       el = document.createElement("div");
       el.id = "aom-toast";
       el.className = "toast";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
       document.body.appendChild(el);
     }
     el.textContent = msg;
@@ -22,7 +24,7 @@
     clearTimeout(el._t);
     el._t = setTimeout(function () {
       el.classList.remove("show");
-    }, 2400);
+    }, 2200);
   }
 
   function memberName(session, id) {
@@ -187,8 +189,8 @@
 
   function buildShareText(session, plan) {
     var lines = [];
-    lines.push((session.title || "ทริป"));
-    lines.push("วันที่ " + (session.date || ""));
+    lines.push("🧾 " + (session.title || "ทริป"));
+    if (session.date) lines.push("วันที่ " + session.date);
     lines.push("");
     lines.push("— ยอดต่อคน —");
     (session.members || []).forEach(function (m) {
@@ -197,7 +199,7 @@
       var bal = plan.balances[m.id] || 0;
       lines.push(
         m.displayName +
-          ": กิน " +
+          ": ใช้ " +
           AomMoney.formatMoney(owed) +
           " · จ่าย " +
           AomMoney.formatMoney(paid) +

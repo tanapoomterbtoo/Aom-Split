@@ -1,143 +1,146 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810h"></script>
+  <script src="js/boot.js?v=20260811ux"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260810h">
+  <link rel="stylesheet" href="css/app.css?v=20260811ux">
 </head>
-<body>
+<body class="has-bottom-nav">
 
-  <!-- App Header -->
   <header class="app-header">
-    <a href="index.html" class="btn btn-ghost btn-sm" title="กลับหน้าแรก">
-      ← กลับ
+    <a href="index.html" class="btn btn-ghost btn-sm" title="กลับหน้าแรก" style="min-width:var(--touch);">
+      ←
     </a>
-    <div class="spacer"></div>
+    <div class="spacer" style="min-width:0;overflow:hidden;">
+      <input type="text" id="session-title-input" class="session-title-input" placeholder="ชื่อทริป..." style="font-size:1.02rem;padding:0.25rem 0.35rem;" />
+    </div>
     <span id="save-pill" class="save-pill" title="สถานะการบันทึก">บันทึกอัตโนมัติ</span>
-    <div class="sub" id="session-date-badge" style="margin-left:0.35rem;"></div>
   </header>
 
   <main class="container">
-    <!-- Session Title Banner -->
-    <div class="card">
-      <label for="session-title-input">ชื่อทริป</label>
-      <input type="text" id="session-title-input" class="session-title-input" placeholder="ระบุชื่อทริป..." />
+    <div class="session-head-meta">
+      <span id="session-date-badge"></span>
+      <span class="dot" id="session-meta-dot" hidden>·</span>
+      <span id="session-meta-hint" class="muted"></span>
     </div>
 
-    <!-- Sticky Tabs Navigation (in-page — ไม่เปลี่ยนหน้า เพื่อไม่เด้ง) -->
-    <nav class="tabs">
-      <button type="button" id="tab-btn-expenses" class="active" onclick="switchTab('expenses')">
-        รายการ (<span id="tab-count-expenses">0</span>)
-      </button>
-      <button type="button" id="tab-btn-members" onclick="switchTab('members')">
-        สมาชิก (<span id="tab-count-members">0</span>)
-      </button>
-      <button type="button" id="tab-btn-summary" onclick="switchTab('summary')">
-        สรุปโอน
-      </button>
-    </nav>
-
-    <!-- Tab 1: รายการ (Expenses) -->
+    <!-- Tab 1: รายการ -->
     <section id="section-expenses" class="tab-content active">
+      <div id="coach-expenses"></div>
+
       <div class="summary-bar">
         <div>
-          <div class="summary-stat-lbl">ยอดรวม</div>
+          <div class="summary-stat-lbl">ยอดรวมทั้งทริป</div>
           <div class="summary-stat-val" id="total-expenses-amount">฿0.00</div>
         </div>
         <div style="text-align: right;">
-          <div class="summary-stat-lbl">จำนวนรายการ</div>
-          <div style="font-weight: 700; font-size: 1.1rem;" id="total-expenses-count">0 รายการ</div>
+          <div class="summary-stat-lbl">รายการ</div>
+          <div style="font-weight: 700; font-size: 1.1rem;" id="total-expenses-count">0</div>
         </div>
       </div>
 
-      <div id="expenses-list">
-        <!-- Rendered expenses -->
-      </div>
+      <div id="expenses-list"></div>
     </section>
 
-    <!-- Tab 2: สมาชิก (Members) -->
+    <!-- Tab 2: สมาชิก -->
     <section id="section-members" class="tab-content">
-      <!-- Add Member Form Card -->
+      <div id="coach-members"></div>
+
       <div class="card">
         <div class="card-h">
-          <h2>เพิ่มสมาชิก</h2>
+          <h2>เพิ่มเพื่อน</h2>
         </div>
         <form id="add-member-form" onsubmit="handleAddMember(event)">
           <div class="field">
-            <label for="new-member-name">ชื่อสมาชิก</label>
-            <input type="text" id="new-member-name" class="input" placeholder="ชื่อเพื่อน" required autocomplete="off" />
-          </div>
-          <div class="field">
-            <label>สีประจำตัว</label>
-            <div class="color-select-row" id="color-picker-options">
-              <!-- Color dots populated dynamically -->
+            <label for="new-member-name">ชื่อ</label>
+            <div class="member-add-row">
+              <input type="text" id="new-member-name" class="input" placeholder="ชื่อเพื่อน" required autocomplete="off" enterkeyhint="done" />
+              <button type="submit" class="btn btn-primary">เพิ่ม</button>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">+ เพิ่มสมาชิก</button>
+          <div class="field" style="margin-bottom:0;">
+            <label>สี</label>
+            <div class="color-select-row" id="color-picker-options"></div>
+          </div>
         </form>
       </div>
 
       <div class="card info-soft">
-        <div style="font-weight:700; margin-bottom:0.25rem;">พร้อมเพย์</div>
+        <div style="font-weight:700; margin-bottom:0.25rem;">ตั้งพร้อมเพย์ให้ผู้รับ</div>
         <p class="muted" style="margin:0; font-size:0.85rem;">
-          ผู้รับกรอกเบอร์มือถือหรือเลขบัตรประชาชนที่ผูกพร้อมเพย์
-          จากนั้นในแท็บสรุปโอน สามารถสร้าง QR ระบุยอดได้ทันที
+          กรอกเบอร์หรือเลขบัตร ปชช. ของผู้ที่จะรับเงิน — ตอนสรุปโอนจะมี QR ยอดตรง
         </p>
       </div>
 
-      <!-- Members List Card -->
       <div class="card">
         <div class="card-h">
-          <h2>สมาชิกในทริป</h2>
+          <h2>ในทริปนี้</h2>
         </div>
-        <div id="members-list">
-          <!-- Rendered members -->
-        </div>
+        <div id="members-list"></div>
       </div>
     </section>
 
-    <!-- Tab 3: สรุปโอน (in-page, same session — no navigation) -->
+    <!-- Tab 3: สรุปโอน -->
     <section id="section-summary" class="tab-content">
-      <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-        <div>
-          <h2 style="margin:0;font-size:1.1rem;">รายการต้องโอน</h2>
-          <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;">
-            ยอดสุทธิ = จ่ายจริง − ส่วนที่กิน
-            · <span id="summary-build-label" class="badge">…</span>
-          </p>
+      <div class="card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
+          <div>
+            <h2 style="margin:0;font-size:1.12rem;">ใครต้องโอนใคร</h2>
+            <p class="muted" style="margin:0.3rem 0 0;font-size:0.84rem;">
+              สุทธิ = จ่ายจริง − ส่วนที่ใช้
+            </p>
+          </div>
+          <div id="plan-status-badge"></div>
         </div>
-        <div id="plan-status-badge"></div>
+        <div id="settle-progress" style="margin-top:0.65rem;"></div>
+        <span id="summary-build-label" class="muted" style="display:none;font-size:0.7rem;"></span>
       </div>
 
       <div class="card">
         <div class="card-h">
-          <h3 style="margin:0;">👥 ยอดต่อคน</h3>
+          <h3 style="margin:0;">ยอดต่อคน</h3>
         </div>
         <div id="summary-members-list"></div>
       </div>
 
       <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin:0.25rem 0.15rem 0.65rem;">
-        <h3 style="margin:0;font-size:1rem;">รายการต้องโอน</h3>
+        <h3 style="margin:0;font-size:1rem;">รายการโอน</h3>
         <button type="button" class="btn btn-sm btn-ghost" onclick="copyTransfersOnly()">คัดลอก</button>
       </div>
       <div id="summary-transfers-list"></div>
 
-      <div class="card" style="margin-top:0.85rem;">
-        <div class="btn-row" style="flex-direction:column;">
-          <button type="button" class="btn btn-primary btn-block" onclick="shareSummaryAll()">คัดลอกสรุปทั้งก้อน</button>
-          <button type="button" class="btn btn-block" onclick="copyTransfersOnly()">คัดลอกรายการโอน</button>
+      <div class="summary-sticky-actions">
+        <div class="btn-row" style="flex-direction:column;gap:0.4rem;">
+          <button type="button" class="btn btn-primary btn-lg btn-block" onclick="shareSummaryAll()">คัดลอกสรุปไปวางในแชท</button>
+          <button type="button" class="btn btn-block" onclick="copyTransfersOnly()">คัดลอกรายการโอนอย่างเดียว</button>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- Floating Action Button for Adding Expense -->
+  <!-- Bottom thumb-zone navigation -->
+  <nav class="bottom-nav" aria-label="เมนูทริป">
+    <div class="inner">
+      <button type="button" id="tab-btn-expenses" class="active" onclick="switchTab('expenses')">
+        <span class="nav-ico">≡</span>
+        <span class="nav-lbl">รายการ <span class="nav-count" id="tab-count-expenses">0</span></span>
+      </button>
+      <button type="button" id="tab-btn-members" onclick="switchTab('members')">
+        <span class="nav-ico">◎</span>
+        <span class="nav-lbl">สมาชิก <span class="nav-count" id="tab-count-members">0</span></span>
+      </button>
+      <button type="button" id="tab-btn-summary" onclick="switchTab('summary')">
+        <span class="nav-ico">⇄</span>
+        <span class="nav-lbl">สรุปโอน</span>
+      </button>
+    </div>
+  </nav>
+
   <button type="button" id="fab-add-expense" class="fab" onclick="openExpenseModal()">
     <span style="font-size: 1.25rem; line-height: 1;">+</span> เพิ่มรายการ
   </button>
@@ -145,6 +148,7 @@
   <!-- PromptPay: ตั้งหมายเลขผู้รับ -->
   <div id="pp-setup-modal" class="modal-backdrop" onclick="if(event.target===this)closePromptPaySetup()">
     <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-handle" aria-hidden="true"></div>
       <div class="card-h">
         <h3 id="pp-setup-title">ตั้งพร้อมเพย์</h3>
         <button type="button" class="btn btn-ghost btn-sm" onclick="closePromptPaySetup()">✕</button>
@@ -167,6 +171,7 @@
   <!-- PromptPay: QR จ่ายยอด -->
   <div id="pp-pay-modal" class="modal-backdrop" onclick="if(event.target===this)closePromptPayPay()">
     <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-handle" aria-hidden="true"></div>
       <div class="card-h">
         <h3>จ่ายพร้อมเพย์</h3>
         <button type="button" class="btn btn-ghost btn-sm" onclick="closePromptPayPay()">✕</button>
@@ -192,82 +197,83 @@
     </div>
   </div>
 
-  <!-- Expense Modal / Sheet -->
+  <!-- Expense Modal / Sheet — amount-first, advanced split collapsed -->
   <div id="expense-modal" class="modal-backdrop" onclick="handleModalBackdropClick(event)">
     <div class="modal" onclick="event.stopPropagation()">
-      <div class="card-h" style="margin-bottom: 1rem;">
-        <h3 id="modal-title">เพิ่มรายการจ่าย</h3>
+      <div class="modal-handle" aria-hidden="true"></div>
+      <div class="card-h" style="margin-bottom: 0.85rem;">
+        <h3 id="modal-title">เพิ่มรายการ</h3>
         <button type="button" class="btn btn-ghost btn-sm" onclick="closeExpenseModal()">✕</button>
       </div>
 
       <form id="expense-form" onsubmit="handleSaveExpense(event)">
-        <!-- Title -->
         <div class="field">
-          <label for="exp-title">ชื่อรายการ *</label>
-          <input type="text" id="exp-title" class="input" placeholder="เช่น ค่าอาหาร, ค่าที่พัก, ค่าแท็กซี่" required autocomplete="off" />
-        </div>
-
-        <!-- Amount & PaidBy in row -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-          <div class="field">
-            <label for="exp-amount">จำนวนเงิน (บาท) *</label>
-            <input type="number" id="exp-amount" class="input money" placeholder="0.00" step="0.01" min="0.01" required oninput="handleAmountOrModeChange()" />
-          </div>
-          <div class="field">
-            <label for="exp-paid-by">คนจ่าย (Paid By) *</label>
-            <select id="exp-paid-by" class="input" required onchange="handlePaidByChange()">
-              <!-- Options populated dynamically -->
-            </select>
+          <label for="exp-amount">จำนวนเงิน (บาท)</label>
+          <input type="number" id="exp-amount" class="input input-amount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" required oninput="handleAmountOrModeChange()" />
+          <div class="amount-chips" id="amount-chips">
+            <button type="button" data-amt="50">+50</button>
+            <button type="button" data-amt="100">+100</button>
+            <button type="button" data-amt="200">+200</button>
+            <button type="button" data-amt="500">+500</button>
+            <button type="button" data-amt="1000">+1,000</button>
           </div>
         </div>
 
-        <!-- Split Mode Segment -->
         <div class="field">
-          <label>รูปแบบการหาร (Split Mode)</label>
-          <div class="seg" id="split-mode-seg">
-            <button type="button" data-mode="equal" class="on" onclick="setSplitMode('equal')">หารเท่า</button>
-            <button type="button" data-mode="shares" onclick="setSplitMode('shares')">สัดส่วน</button>
-            <button type="button" data-mode="exact" onclick="setSplitMode('exact')">ระบุบาท</button>
-            <button type="button" data-mode="treat" onclick="setSplitMode('treat')">เลี้ยง </button>
-          </div>
-          <div id="split-mode-help" class="split-mode-desc">
-            หารเท่ากันทุกคนที่ร่วมรายการ
-          </div>
+          <label for="exp-title">ชื่อรายการ</label>
+          <input type="text" id="exp-title" class="input" placeholder="เช่น ค่าอาหาร, แท็กซี่, ค่าที่พัก" required autocomplete="off" />
         </div>
 
-        <!-- Participant Chips (Toggle who joins) -->
+        <div class="field">
+          <label for="exp-paid-by">ใครจ่าย</label>
+          <select id="exp-paid-by" class="input" required onchange="handlePaidByChange()"></select>
+        </div>
+
         <div class="field" id="participants-field-group">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-            <label style="margin:0;">ผู้ร่วมหาร (แตะเพื่อเปิด/ปิด)</label>
-            <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.75rem; padding:0.1rem 0.4rem;" onclick="selectAllParticipants()">เลือกทุกคน</button>
+            <label style="margin:0;">ใครร่วมหาร</label>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="selectAllParticipants()">ทุกคน</button>
           </div>
-          <div class="chip-row" id="participant-chips-container">
-            <!-- Chips rendered dynamically -->
+          <div class="chip-row" id="participant-chips-container"></div>
+        </div>
+
+        <div class="field" id="mode-details-field">
+          <div id="mode-details-container"></div>
+        </div>
+
+        <div class="field">
+          <button type="button" class="adv-toggle" id="adv-split-toggle" aria-expanded="false" onclick="toggleAdvancedSplit()">
+            <span id="adv-split-label">รูปแบบการหาร · หารเท่า</span>
+            <span class="chev">▾</span>
+          </button>
+          <div class="adv-panel" id="adv-split-panel">
+            <div class="seg" id="split-mode-seg">
+              <button type="button" data-mode="equal" class="on" onclick="setSplitMode('equal')">หารเท่า</button>
+              <button type="button" data-mode="shares" onclick="setSplitMode('shares')">สัดส่วน</button>
+              <button type="button" data-mode="exact" onclick="setSplitMode('exact')">ระบุบาท</button>
+              <button type="button" data-mode="treat" onclick="setSplitMode('treat')">เลี้ยง</button>
+            </div>
+            <div id="split-mode-help" class="split-mode-desc">หารเท่ากันทุกคนที่เลือก</div>
           </div>
         </div>
 
-        <!-- Mode Specific Dynamic Container -->
-        <div class="field" id="mode-details-container">
-          <!-- Dynamic contents for shares / exact / treat -->
-        </div>
-
-        <!-- Submit & Delete Buttons -->
-        <div class="btn-row" style="margin-top: 1.25rem;">
-          <button type="submit" class="btn btn-primary" style="flex: 2;">บันทึกรายการ</button>
-          <button type="button" id="btn-modal-delete" class="btn btn-danger" style="flex: 1; display: none;" onclick="handleDeleteExpenseFromModal()">ลบรายการ</button>
-          <button type="button" class="btn" style="flex: 1;" onclick="closeExpenseModal()">ยกเลิก</button>
+        <div class="btn-row" style="margin-top: 0.5rem; flex-direction:column;">
+          <button type="submit" class="btn btn-primary btn-lg btn-block">บันทึกรายการ</button>
+          <div style="display:flex;gap:0.4rem;">
+            <button type="button" id="btn-modal-delete" class="btn btn-danger" style="flex:1; display:none;" onclick="handleDeleteExpenseFromModal()">ลบ</button>
+            <button type="button" class="btn" style="flex:1;" onclick="closeExpenseModal()">ยกเลิก</button>
+          </div>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Shared Scripts -->
-  <script src="js/money.js?v=20260810h"></script>
-  <script src="js/store.js?v=20260810h"></script>
-  <script src="js/ui.js?v=20260810h"></script>
-  <script src="js/promptpay.js?v=20260810h"></script>
-  <script src="js/qrcode.min.js?v=20260810h"></script>
-  <script src="js/summary-view.js?v=20260810h"></script>
+  <script src="js/money.js?v=20260811ux"></script>
+  <script src="js/store.js?v=20260811ux"></script>
+  <script src="js/ui.js?v=20260811ux"></script>
+  <script src="js/promptpay.js?v=20260811ux"></script>
+  <script src="js/qrcode.min.js?v=20260811ux"></script>
+  <script src="js/summary-view.js?v=20260811ux"></script>
 
   <script>
     // App State
@@ -470,7 +476,7 @@
       initPage();
     }
 
-    // Tab Switching — all in-page (no navigation)
+    // Tab Switching — bottom nav, all in-page
     function switchTab(tab) {
       activeTab = tab || 'expenses';
       const btnExpenses = document.getElementById('tab-btn-expenses');
@@ -491,11 +497,11 @@
       if (activeTab === 'members') {
         if (btnMembers) btnMembers.classList.add('active');
         if (secMembers) secMembers.classList.add('active');
-        if (fab) fab.style.display = 'none';
+        if (fab) fab.hidden = true;
       } else if (activeTab === 'summary') {
         if (btnSummary) btnSummary.classList.add('active');
         if (secSummary) secSummary.classList.add('active');
-        if (fab) fab.style.display = 'none';
+        if (fab) fab.hidden = true;
         try {
           AomStore.upsertSession(currentSession);
         } catch (e) { /* ignore */ }
@@ -509,7 +515,86 @@
         activeTab = 'expenses';
         if (btnExpenses) btnExpenses.classList.add('active');
         if (secExpenses) secExpenses.classList.add('active');
-        if (fab) fab.style.display = 'flex';
+        if (fab) fab.hidden = false;
+      }
+    }
+
+    function renderCoachCards() {
+      if (!currentSession) return;
+      const members = currentSession.members || [];
+      const expenses = (currentSession.expenses || []).filter(function (e) { return !e.deleted; });
+      const coachExp = document.getElementById('coach-expenses');
+      const coachMem = document.getElementById('coach-members');
+      const metaHint = document.getElementById('session-meta-hint');
+      const metaDot = document.getElementById('session-meta-dot');
+
+      if (metaHint) {
+        if (!members.length) {
+          metaHint.textContent = 'เพิ่มสมาชิกก่อน';
+          if (metaDot) metaDot.hidden = false;
+        } else if (!expenses.length) {
+          metaHint.textContent = members.length + ' คน · ยังไม่มีรายการ';
+          if (metaDot) metaDot.hidden = false;
+        } else {
+          metaHint.textContent = members.length + ' คน · ' + expenses.length + ' รายการ';
+          if (metaDot) metaDot.hidden = false;
+        }
+      }
+
+      if (coachExp) {
+        if (!members.length) {
+          coachExp.innerHTML =
+            '<div class="coach-card">' +
+            '<div class="coach-step">1</div>' +
+            '<div class="coach-body">' +
+            '<div class="coach-title">เริ่มจากเพิ่มเพื่อน</div>' +
+            '<p class="coach-desc">ต้องมีสมาชิกอย่างน้อย 1 คนก่อนบันทึกรายการจ่าย</p>' +
+            '<div class="coach-actions"><button type="button" class="btn btn-primary btn-sm" onclick="switchTab(\'members\')">ไปแท็บสมาชิก</button></div>' +
+            '</div></div>';
+        } else if (!expenses.length) {
+          coachExp.innerHTML =
+            '<div class="coach-card">' +
+            '<div class="coach-step">2</div>' +
+            '<div class="coach-body">' +
+            '<div class="coach-title">เพิ่มรายการจ่ายแรก</div>' +
+            '<p class="coach-desc">กดปุ่มด้านล่าง · ใส่ยอด ใครจ่าย ใครร่วม — ระบบหารให้</p>' +
+            '<div class="coach-actions"><button type="button" class="btn btn-primary btn-sm" onclick="openExpenseModal()">+ เพิ่มรายการ</button></div>' +
+            '</div></div>';
+        } else {
+          coachExp.innerHTML =
+            '<div class="coach-card" style="padding:0.7rem 0.9rem;">' +
+            '<div class="coach-body" style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;width:100%;">' +
+            '<p class="coach-desc" style="margin:0;">พร้อมสรุปโอนเมื่อบันทึกรายการครบ</p>' +
+            '<button type="button" class="btn btn-sm" onclick="switchTab(\'summary\')">ดูสรุปโอน →</button>' +
+            '</div></div>';
+        }
+      }
+
+      if (coachMem) {
+        if (!members.length) {
+          coachMem.innerHTML =
+            '<div class="coach-card">' +
+            '<div class="coach-step">!</div>' +
+            '<div class="coach-body">' +
+            '<div class="coach-title">ทริปนี้ยังไม่มีสมาชิก</div>' +
+            '<p class="coach-desc">พิมพ์ชื่อเพื่อนด้านล่าง แล้วกดเพิ่ม</p>' +
+            '</div></div>';
+        } else {
+          var noPp = members.filter(function (m) {
+            return !(window.AomPromptPay && AomPromptPay.memberHasPromptPay(m));
+          }).length;
+          if (noPp > 0 && expenses.length > 0) {
+            coachMem.innerHTML =
+              '<div class="coach-card">' +
+              '<div class="coach-step">PP</div>' +
+              '<div class="coach-body">' +
+              '<div class="coach-title">ตั้งพร้อมเพย์ให้ผู้รับ</div>' +
+              '<p class="coach-desc">ยังมี ' + noPp + ' คนที่ยังไม่ตั้ง — ตั้งแล้วสแกน QR ได้ตอนสรุปโอน</p>' +
+              '</div></div>';
+          } else {
+            coachMem.innerHTML = '';
+          }
+        }
       }
     }
 
@@ -549,9 +634,29 @@
       // Render Members Section
       renderMembersList(members, expenses);
 
+      renderCoachCards();
+
       if (activeTab === 'summary') {
         renderSummary();
       }
+    }
+
+    function updateSettleProgress(plan) {
+      var box = document.getElementById('settle-progress');
+      if (!box) return;
+      if (!plan || !plan.transfers || !plan.transfers.length) {
+        box.innerHTML = '';
+        return;
+      }
+      var total = plan.transfers.length;
+      var done = 0;
+      plan.transfers.forEach(function (t) {
+        if (AomStore.isTransferMarked && AomStore.isTransferMarked(currentSession, t)) done += 1;
+      });
+      var pct = Math.round((done / total) * 100);
+      box.innerHTML =
+        '<div class="progress-label"><span>โอนแล้ว ' + done + '/' + total + '</span><span>' + pct + '%</span></div>' +
+        '<div class="progress-bar" aria-hidden="true"><i style="width:' + pct + '%"></i></div>';
     }
 
     function renderSummary() {
@@ -559,7 +664,7 @@
       if (!window.AomSummaryView || typeof AomSummaryView.render !== 'function') {
         var box = document.getElementById('summary-transfers-list');
         if (box) {
-          box.textContent = 'โหลดโมดูลสรุปไม่สำเร็จ — รีเฟรชหน้า (build ใหม่)';
+          box.textContent = 'โหลดโมดูลสรุปไม่สำเร็จ — รีเฟรชหน้า';
         }
         return;
       }
@@ -578,6 +683,7 @@
         onPromptPay: openPromptPayPay,
         onSetupPromptPay: openPromptPaySetup,
       });
+      updateSettleProgress(lastPlan);
     }
 
     /* ───── PromptPay ───── */
@@ -781,8 +887,8 @@
         container.innerHTML = `
           <div class="card empty">
             <div class="empty-icon">∅</div>
-            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text);">ยังไม่มีรายการจ่าย</div>
-            <div style="margin-top: 0.38rem;">กดปุ่ม <strong>"เพิ่มรายการ"</strong> ด้านล่างเพื่อเพิ่มรายการแรก</div>
+            <div class="empty-title">ยังไม่มีรายการ</div>
+            <div style="margin-top: 0.38rem;">กด <strong>เพิ่มรายการ</strong> ด้านล่าง</div>
           </div>
         `;
         return;
@@ -792,7 +898,7 @@
         equal: 'หารเท่า',
         shares: 'สัดส่วน',
         exact: 'ระบุบาท',
-        treat: 'เลี้ยง '
+        treat: 'เลี้ยง'
       };
 
       container.innerHTML = expenses.map(function (e) {
@@ -804,30 +910,28 @@
         }).join(' ');
 
         return `
-          <div class="card">
+          <div class="card exp-card" role="button" tabindex="0" onclick="openExpenseModal('${e.id}')">
             <div class="card-h" style="margin-bottom: 0.4rem;">
-              <div>
+              <div style="min-width:0;">
                 <span class="list-item-title" style="font-weight: 700; font-size: 1.05rem;">${escapeHtml(e.title)}</span>
                 <span class="badge-mode" style="margin-left: 0.4rem;">${modeText}</span>
               </div>
               <div class="money big">${AomMoney.formatMoney(e.amountMinor)}</div>
             </div>
-            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem;">
-              <div style="display: flex; align-items: center; gap: 0.4rem;">
-                <span>คนจ่าย:</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; gap:0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.4rem; min-width:0;">
+                <span>จ่ายโดย</span>
                 ${AomUI.avatar(currentSession, e.paidByMemberId, 22)}
                 <strong style="color: var(--text);">${escapeHtml(paidByName)}</strong>
               </div>
-              <div class="exp-item-actions">
-                <button type="button" class="btn btn-ghost btn-sm btn-icon" onclick="openExpenseModal('${e.id}')" title="แก้ไข">แก้ไข</button>
-                <button type="button" class="btn btn-ghost btn-sm btn-icon" style="color: var(--bad);" onclick="deleteExpenseDirect('${e.id}')" title="ลบ">ลบ</button>
-              </div>
+              <span class="exp-tap-hint">แตะแก้ ›</span>
             </div>
-            <div style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); display: flex; align-items: center; gap: 0.4rem;">
-              <span style="font-size: 0.78rem; color: var(--muted);">ผู้ร่วมหาร (${parts.length} คน):</span>
+            <div style="margin-top: 0.55rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); display: flex; align-items: center; gap: 0.4rem; flex-wrap:wrap;">
+              <span style="font-size: 0.78rem; color: var(--muted);">ร่วม ${parts.length}:</span>
               <div style="display: flex; gap: 0.2rem; flex-wrap: wrap;">
                 ${partAvatars || '<span style="font-size:0.78rem; color:var(--muted);">-</span>'}
               </div>
+              <button type="button" class="btn btn-ghost btn-sm" style="margin-left:auto;color:var(--bad);" onclick="event.stopPropagation();deleteExpenseDirect('${e.id}')">ลบ</button>
             </div>
           </div>
         `;
@@ -933,10 +1037,29 @@
 
     // --- EXPENSE MODAL LOGIC ---
 
+    function setAdvancedSplitOpen(open) {
+      var panel = document.getElementById('adv-split-panel');
+      var toggle = document.getElementById('adv-split-toggle');
+      if (!panel || !toggle) return;
+      if (open) {
+        panel.classList.add('open');
+        toggle.setAttribute('aria-expanded', 'true');
+      } else {
+        panel.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function toggleAdvancedSplit() {
+      var toggle = document.getElementById('adv-split-toggle');
+      var open = toggle && toggle.getAttribute('aria-expanded') === 'true';
+      setAdvancedSplitOpen(!open);
+    }
+
     function openExpenseModal(expenseId) {
       const members = currentSession.members || [];
       if (!members.length) {
-        alert('กรุณาเพิ่มสมาชิกในแท็บสมาชิกก่อนเพิ่มรายการจ่าย');
+        AomUI.toast('เพิ่มสมาชิกก่อนนะ');
         switchTab('members');
         return;
       }
@@ -953,7 +1076,7 @@
 
       // Reset / Populate Form
       if (editingExpenseId) {
-        modalTitle.textContent = 'แก้ไขรายการจ่าย';
+        modalTitle.textContent = 'แก้ไขรายการ';
         btnDelete.style.display = 'block';
         const exp = (currentSession.expenses || []).find(function (e) { return e.id === expenseId; });
         if (exp) {
@@ -975,7 +1098,7 @@
           });
         }
       } else {
-        modalTitle.textContent = 'เพิ่มรายการจ่าย';
+        modalTitle.textContent = 'เพิ่มรายการ';
         btnDelete.style.display = 'none';
         document.getElementById('exp-title').value = '';
         document.getElementById('exp-amount').value = '';
@@ -995,9 +1118,15 @@
       updateSplitModeSegUI();
       renderParticipantChips();
       renderModeDetails();
+      // open advanced only when not default equal (so edit with shares/exact is visible)
+      setAdvancedSplitOpen(currentSplitMode !== 'equal');
 
       const modal = document.getElementById('expense-modal');
       modal.classList.add('show');
+      setTimeout(function () {
+        var amt = document.getElementById('exp-amount');
+        if (amt && !editingExpenseId) amt.focus();
+      }, 80);
     }
 
     function closeExpenseModal() {
@@ -1039,19 +1168,27 @@
 
       const helpEl = document.getElementById('split-mode-help');
       const partsGroup = document.getElementById('participants-field-group');
+      const modeNames = { equal: 'หารเท่า', shares: 'สัดส่วน', exact: 'ระบุบาท', treat: 'เลี้ยง' };
+      const advLabel = document.getElementById('adv-split-label');
+      if (advLabel) {
+        advLabel.textContent = 'รูปแบบการหาร · ' + (modeNames[currentSplitMode] || 'หารเท่า');
+      }
 
       if (currentSplitMode === 'equal') {
-        helpEl.textContent = 'หารเท่ากันทุกคนที่เลือกเป็นผู้ร่วมหาร';
-        partsGroup.style.display = 'block';
+        if (helpEl) helpEl.textContent = 'หารเท่ากันทุกคนที่เลือก';
+        if (partsGroup) partsGroup.style.display = 'block';
       } else if (currentSplitMode === 'shares') {
-        helpEl.textContent = 'หารตามสัดส่วน/จำนวนส่วน (เช่น 2 ช็อต, 3 ช็อต)';
-        partsGroup.style.display = 'block';
+        if (helpEl) helpEl.textContent = 'ตั้งจำนวนส่วนต่อคน (เช่น 2:1)';
+        if (partsGroup) partsGroup.style.display = 'block';
+        setAdvancedSplitOpen(true);
       } else if (currentSplitMode === 'exact') {
-        helpEl.textContent = 'กำหนดจำนวนเงินบาทของแต่ละคนโดยตรง';
-        partsGroup.style.display = 'block';
+        if (helpEl) helpEl.textContent = 'ใส่จำนวนบาทของแต่ละคนให้รวมตรงยอด';
+        if (partsGroup) partsGroup.style.display = 'block';
+        setAdvancedSplitOpen(true);
       } else if (currentSplitMode === 'treat') {
-        helpEl.textContent = 'คนจ่ายเลี้ยงทั้งบิล (คนจ่ายรับผิดชอบ 100%)';
-        partsGroup.style.display = 'none';
+        if (helpEl) helpEl.textContent = 'คนจ่ายเลี้ยงทั้งบิล (100%)';
+        if (partsGroup) partsGroup.style.display = 'none';
+        setAdvancedSplitOpen(true);
       }
     }
 
@@ -1120,8 +1257,9 @@
         if (amountBaht > 0 && activeMembers.length > 0) {
           const perPerson = (amountBaht / activeMembers.length).toFixed(2);
           container.innerHTML = `
-            <div style="font-size: 0.85rem; color: var(--muted); background: var(--bg); padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid var(--border);">
-              💡 ตกคนละประมาณ <strong class="money" style="color: var(--accent);">฿${perPerson}</strong> (${activeMembers.length} คน)
+            <div style="font-size: 0.9rem; color: var(--muted); background: var(--bg-soft); padding: 0.7rem 0.85rem; border-radius: 10px; border: 1px solid var(--border); text-align:center;">
+              คนละประมาณ <strong class="money" style="color: var(--info); font-size:1.05rem;">฿${perPerson}</strong>
+              <span style="opacity:0.8;"> · ${activeMembers.length} คน</span>
             </div>
           `;
         } else {
@@ -1247,6 +1385,22 @@
       }
     }
 
+    // Amount quick chips (+N baht)
+    (function bindAmountChips() {
+      var box = document.getElementById('amount-chips');
+      if (!box) return;
+      box.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('button[data-amt]');
+        if (!btn) return;
+        var add = Number(btn.getAttribute('data-amt')) || 0;
+        var inp = document.getElementById('exp-amount');
+        var cur = Number(inp.value) || 0;
+        inp.value = String(Math.round((cur + add) * 100) / 100);
+        handleAmountOrModeChange();
+        inp.focus();
+      });
+    })();
+
     // Save Expense Handler
     function handleSaveExpense(e) {
       e.preventDefault();
@@ -1255,16 +1409,18 @@
       const amountBaht = Number(document.getElementById('exp-amount').value);
       const paidByMemberId = document.getElementById('exp-paid-by').value;
 
-      if (!title) {
-        alert('กรุณาระบุชื่อรายการ');
+      if (!amountBaht || amountBaht <= 0) {
+        AomUI.toast('ใส่จำนวนเงินก่อน');
+        document.getElementById('exp-amount').focus();
         return;
       }
-      if (!amountBaht || amountBaht <= 0) {
-        alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
+      if (!title) {
+        AomUI.toast('ใส่ชื่อรายการด้วย');
+        document.getElementById('exp-title').focus();
         return;
       }
       if (!paidByMemberId) {
-        alert('กรุณาเลือกคนจ่าย');
+        AomUI.toast('เลือกคนจ่าย');
         return;
       }
 
@@ -1272,7 +1428,7 @@
       const participants = Array.from(selectedParticipantIds);
 
       if (currentSplitMode !== 'treat' && !participants.length) {
-        alert('กรุณาเลือกผู้ร่วมหารอย่างน้อย 1 คน');
+        AomUI.toast('เลือกผู้ร่วมหารอย่างน้อย 1 คน');
         return;
       }
 
@@ -1302,7 +1458,7 @@
         expenseData.exactMinor = modeExactMinor;
 
         if (sumExactSatang !== amountMinor) {
-          alert('ยอดรวมการระบุบาท (' + AomMoney.formatMoney(sumExactSatang) + ') ไม่ตรงกับยอดรายการ (' + AomMoney.formatMoney(amountMinor) + ')');
+          AomUI.toast('ยอดระบุบาทไม่ตรง · ต้องรวม ' + AomMoney.formatMoney(amountMinor));
           return;
         }
       }
@@ -1311,7 +1467,7 @@
       try {
         AomMoney.resolveSplits(expenseData);
       } catch (err) {
-        alert('เกิดข้อผิดพลาดในการคำนวณ: ' + err.message);
+        AomUI.toast('คำนวณไม่สำเร็จ: ' + err.message);
         return;
       }
 
@@ -1331,7 +1487,7 @@
       AomStore.upsertSession(currentSession);
       closeExpenseModal();
       render();
-      AomUI.toast(editingExpenseId ? 'แก้ไขรายการเรียบร้อย' : 'เพิ่มรายการเรียบร้อย');
+      AomUI.toast(editingExpenseId ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่มรายการแล้ว');
     }
 
     // Delete Expense from Modal

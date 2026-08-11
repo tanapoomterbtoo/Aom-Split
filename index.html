@@ -1,40 +1,67 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260810h"></script>
+  <script src="js/boot.js?v=20260811ux"></script>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Aom Split — หารเงิน</title>
   <meta name="description" content="หารเงินในกลุ่ม บันทึกรายการ จ่าย พร้อมเพย์ สรุปใครโอนใคร" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/app.css?v=20260810h" />
+  <link rel="stylesheet" href="css/app.css?v=20260811ux" />
 </head>
-<body>
+<body class="index-page">
   <header class="app-header">
     <a href="index.html" class="brand">
       <div class="logo">A</div>
       <div>
         <h1>Aom Split</h1>
-        <p class="sub">หารเงินกลุ่ม</p>
+        <p class="sub">หารเงินกลุ่ม · ง่าย</p>
       </div>
     </a>
     <div class="spacer"></div>
     <button type="button" id="btn-sync-status" class="save-pill cloud" title="แตะเพื่อซิงก์ตอนนี้">ซิงก์…</button>
-    <button id="btn-header-new" class="btn btn-primary btn-sm">+ สร้างทริป</button>
   </header>
 
   <main class="container">
     <div class="page-head">
       <h2>
-        รายการทริป
+        ทริปของกลุ่ม
         <span id="session-count-badge" class="badge">0</span>
       </h2>
       <div class="actions">
-        <button type="button" id="btn-export" class="btn btn-sm btn-ghost" title="ส่งออกสำรอง">ส่งออก</button>
+        <button type="button" id="btn-export" class="btn btn-sm btn-ghost" title="ส่งออกสำรอง">สำรอง</button>
         <button type="button" id="btn-import" class="btn btn-sm btn-ghost" title="นำเข้าสำรอง">นำเข้า</button>
         <input type="file" id="input-import" accept="application/json,.json" hidden />
+      </div>
+    </div>
+
+    <button type="button" id="btn-header-new" class="btn btn-primary btn-lg btn-block" style="margin-bottom:0.9rem;">
+      + สร้างทริปใหม่
+    </button>
+
+    <div id="howto-block" class="how-steps" hidden>
+      <div class="how-step">
+        <div class="n">1</div>
+        <div>
+          <div class="t">สร้างทริป + ใส่ชื่อเพื่อน</div>
+          <div class="d">เช่น ทานข้าว / ทริป / ค่าบ้าน</div>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="n">2</div>
+        <div>
+          <div class="t">บันทึกใครจ่ายอะไร</div>
+          <div class="d">หารเท่า สัดส่วน หรือเลี้ยง</div>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="n">3</div>
+        <div>
+          <div class="t">ดูสรุปโอน + สแกนพร้อมเพย์</div>
+          <div class="d">รู้ทันทีว่าใครโอนใครเท่าไหร่</div>
+        </div>
       </div>
     </div>
 
@@ -42,37 +69,52 @@
   </main>
 
   <div id="modal-create" class="modal-backdrop">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-labelledby="create-modal-title">
+      <div class="modal-handle" aria-hidden="true"></div>
       <div class="card-h">
-        <h3>สร้างทริปใหม่</h3>
+        <h3 id="create-modal-title">สร้างทริปใหม่</h3>
         <button type="button" id="btn-modal-close" class="btn btn-ghost btn-sm" aria-label="ปิด">✕</button>
       </div>
       <form id="form-create-session" onsubmit="return false;">
         <div class="field">
-          <label for="input-title">ชื่อทริป / กิจกรรม</label>
-          <input type="text" id="input-title" class="input" placeholder="เช่น ทริปทะเล, ร้านอาหาร, ค่าเช่า" required />
+          <label for="input-title">ชื่อทริป</label>
+          <input type="text" id="input-title" class="input" placeholder="เช่น ร้านอาหาร, ทริปทะเล" required autocomplete="off" />
         </div>
+
         <div class="field">
-          <label for="input-members">สมาชิก (หนึ่งชื่อต่อบรรทัด)</label>
-          <textarea id="input-members" rows="4" class="input" placeholder="ชื่อเพื่อน 1 คนต่อบรรทัด"></textarea>
-          <span class="hint">เพิ่มหรือแก้ไขสมาชิกทีหลังในทริปได้</span>
+          <label for="input-member-one">สมาชิกในกลุ่ม</label>
+          <div class="member-add-row">
+            <input type="text" id="input-member-one" class="input" placeholder="พิมพ์ชื่อแล้วกดเพิ่ม" autocomplete="off" enterkeyhint="done" />
+            <button type="button" id="btn-add-member-chip" class="btn btn-primary">เพิ่ม</button>
+          </div>
+          <div id="member-chips" class="chip-row" style="margin-top:0.55rem;"></div>
+          <span class="hint">กด Enter เพื่อเพิ่มเร็ว · ใส่ได้หลายคน</span>
+          <details class="details-hint" style="margin-top:0.55rem;">
+            <summary>วางชื่อทีละหลายคน</summary>
+            <textarea id="input-members-bulk" rows="3" class="input" style="margin-top:0.45rem;" placeholder="ชื่อหนึ่งคนต่อบรรทัด หรือคั่นด้วยจุลภาค"></textarea>
+            <button type="button" id="btn-apply-bulk" class="btn btn-sm" style="margin-top:0.4rem;">นำเข้าจากรายการ</button>
+          </details>
         </div>
+
         <div class="btn-row" style="flex-direction: column; margin-top: 0.35rem;">
-          <button type="submit" id="btn-create-submit" class="btn btn-primary btn-block">สร้างและเริ่มหาร</button>
+          <button type="submit" id="btn-create-submit" class="btn btn-primary btn-lg btn-block">สร้างแล้วเริ่มหาร</button>
           <button type="button" id="btn-modal-cancel" class="btn btn-ghost btn-block">ยกเลิก</button>
         </div>
       </form>
     </div>
   </div>
 
-  <script src="js/money.js?v=20260810h"></script>
-  <script src="js/store.js?v=20260810h"></script>
-  <script src="js/ui.js?v=20260810h"></script>
+  <script src="js/money.js?v=20260811ux"></script>
+  <script src="js/store.js?v=20260811ux"></script>
+  <script src="js/ui.js?v=20260811ux"></script>
   <script>
     (function () {
       const modalEl = document.getElementById("modal-create");
       const titleInput = document.getElementById("input-title");
-      const membersInput = document.getElementById("input-members");
+      const memberOne = document.getElementById("input-member-one");
+      const memberChipsEl = document.getElementById("member-chips");
+      const bulkInput = document.getElementById("input-members-bulk");
+      let createMembers = [];
 
       function refreshRemoteUi() {
         const pill = document.getElementById("btn-sync-status");
@@ -82,7 +124,7 @@
         pill.classList.remove("cloud", "cloud-err");
         if (!on) {
           pill.textContent = "เครื่องนี้";
-          pill.title = "โหมดเฉพาะเครื่อง";
+          pill.title = "โหมดเฉพาะเครื่องนี้";
           return;
         }
         if (st.ok === false) {
@@ -95,16 +137,72 @@
           pill.title = st.message || "กำลังซิงก์";
         } else {
           pill.classList.add("cloud");
-          pill.textContent = "ซิงก์แล้ว";
+          pill.textContent = "กลุ่มออนไลน์";
           pill.title = (st.message || "ซิงก์กลุ่มอัตโนมัติ") + " — แตะเพื่อซิงก์ตอนนี้";
         }
       }
 
+      function renderMemberChips() {
+        if (!createMembers.length) {
+          memberChipsEl.innerHTML =
+            '<span class="muted" style="font-size:0.85rem;">ยังไม่มีสมาชิก — เพิ่มอย่างน้อย 1 คน</span>';
+          return;
+        }
+        memberChipsEl.innerHTML = createMembers
+          .map(function (name, i) {
+            return (
+              '<span class="chip-remove">' +
+              escapeHtml(name) +
+              '<button type="button" data-i="' +
+              i +
+              '" aria-label="ลบ ' +
+              escapeHtml(name) +
+              '">×</button></span>'
+            );
+          })
+          .join("");
+        memberChipsEl.querySelectorAll("button[data-i]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            createMembers.splice(Number(btn.getAttribute("data-i")), 1);
+            renderMemberChips();
+          });
+        });
+      }
+
+      function addMemberName(raw) {
+        var name = String(raw || "").trim();
+        if (!name) return false;
+        var exists = createMembers.some(function (n) {
+          return n.toLowerCase() === name.toLowerCase();
+        });
+        if (exists) {
+          AomUI.toast("มีชื่อนี้แล้ว");
+          return false;
+        }
+        createMembers.push(name);
+        renderMemberChips();
+        return true;
+      }
+
+      function parseNames(text) {
+        return String(text || "")
+          .split(/[\n,;]+/)
+          .map(function (s) {
+            return s.trim();
+          })
+          .filter(Boolean);
+      }
+
       function openModal() {
         titleInput.value = "";
-        membersInput.value = "";
+        memberOne.value = "";
+        bulkInput.value = "";
+        createMembers = [];
+        renderMemberChips();
         modalEl.classList.add("show");
-        titleInput.focus();
+        setTimeout(function () {
+          titleInput.focus();
+        }, 50);
       }
 
       function closeModal() {
@@ -113,19 +211,25 @@
 
       function handleCreateSession(e) {
         if (e) e.preventDefault();
-        const title = titleInput.value.trim() || "ทริปใหม่";
-        const names = membersInput.value
-          .split(/[\n,]/)
-          .map(function (s) { return s.trim(); })
-          .filter(Boolean);
+        // absorb pending name in the single-line field
+        if (memberOne.value.trim()) {
+          addMemberName(memberOne.value);
+          memberOne.value = "";
+        }
+        // also absorb bulk if left open with text
+        parseNames(bulkInput.value).forEach(function (n) {
+          addMemberName(n);
+        });
 
-        if (names.length === 0) {
-          AomUI.toast("กรุณาใส่ชื่อสมาชิกอย่างน้อย 1 คน");
+        const title = titleInput.value.trim() || "ทริปใหม่";
+        if (createMembers.length === 0) {
+          AomUI.toast("เพิ่มสมาชิกอย่างน้อย 1 คน");
+          memberOne.focus();
           return;
         }
 
         try {
-          const session = AomStore.createSession(title, names);
+          const session = AomStore.createSession(title, createMembers.slice());
           closeModal();
           var go = function () {
             AomUI.go("session.html", { id: session.id });
@@ -155,16 +259,19 @@
       function render() {
         const sessions = AomStore.listSessions();
         const listContainer = document.getElementById("session-list");
+        const howto = document.getElementById("howto-block");
         document.getElementById("session-count-badge").textContent = sessions.length;
+
+        if (howto) howto.hidden = sessions.length > 0;
 
         if (sessions.length === 0) {
           listContainer.innerHTML =
             '<div class="card empty">' +
             '<div class="empty-icon">∅</div>' +
             '<div class="empty-title">ยังไม่มีทริป</div>' +
-            "<p>สร้างทริป เพิ่มสมาชิก แล้วบันทึกรายการจ่ายได้ทันที</p>" +
+            "<p>สร้างทริป ใส่ชื่อเพื่อน แล้วบันทึกรายการจ่ายได้ทันที</p>" +
             '<div class="btn-row" style="justify-content:center;margin-top:1rem;">' +
-            '<button type="button" class="btn btn-primary btn-sm btn-create-trigger">+ สร้างทริปแรก</button>' +
+            '<button type="button" class="btn btn-primary btn-lg btn-create-trigger">+ สร้างทริปแรก</button>' +
             "</div></div>";
           listContainer.querySelectorAll(".btn-create-trigger").forEach(function (btn) {
             btn.addEventListener("click", openModal);
@@ -183,15 +290,15 @@
           }, 0);
           var formattedSpent = AomMoney.formatMoney(totalSpentMinor);
           var memberAvatars = members
-            .slice(0, 4)
+            .slice(0, 5)
             .map(function (m) {
-              return AomUI.avatar(s, m.id, 24);
+              return AomUI.avatar(s, m.id, 26);
             })
             .join("");
           var extra =
-            members.length > 4
+            members.length > 5
               ? '<span class="muted" style="font-size:0.75rem;margin-left:0.2rem;">+' +
-                (members.length - 4) +
+                (members.length - 5) +
                 "</span>"
               : "";
           var dateStr =
@@ -201,10 +308,10 @@
           html +=
             '<div class="card session-card" data-id="' +
             s.id +
-            '">' +
+            '" role="button" tabindex="0">' +
             '<div class="card-h" style="margin-bottom:0.35rem;">' +
             '<div style="min-width:0;flex:1;">' +
-            '<div class="title" style="font-size:1.02rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+            '<div class="title" style="font-size:1.05rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
             escapeHtml(s.title || "ทริปใหม่") +
             "</div>" +
             '<div class="session-meta">' +
@@ -218,7 +325,7 @@
             activeExpenses.length +
             " รายการ</span>" +
             "</div></div>" +
-            '<div class="money big" style="font-size:1.1rem;flex-shrink:0;">' +
+            '<div class="money big" style="font-size:1.15rem;flex-shrink:0;">' +
             formattedSpent +
             "</div></div>" +
             '<div class="session-card-foot">' +
@@ -236,20 +343,31 @@
                 .join(", ")
             ) +
             "</span></div>" +
+            '<span class="open-hint">เปิด <span class="chev">›</span></span>' +
+            "</div>" +
+            '<div style="display:flex;justify-content:flex-end;margin-top:0.35rem;">' +
             '<button type="button" class="btn btn-ghost btn-sm btn-delete-session" data-id="' +
             s.id +
             '" data-title="' +
             escapeHtml(s.title || "") +
-            '">ลบ</button>' +
-            "</div></div>";
+            '">ลบ</button></div></div>';
         });
 
         listContainer.innerHTML = html;
 
         listContainer.querySelectorAll(".session-card").forEach(function (card) {
+          function open() {
+            AomUI.go("session.html", { id: card.getAttribute("data-id") });
+          }
           card.addEventListener("click", function (e) {
             if (e.target.closest(".btn-delete-session")) return;
-            AomUI.go("session.html", { id: card.getAttribute("data-id") });
+            open();
+          });
+          card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              open();
+            }
           });
         });
         listContainer.querySelectorAll(".btn-delete-session").forEach(function (btn) {
@@ -292,6 +410,29 @@
       document.getElementById("btn-modal-cancel").addEventListener("click", closeModal);
       document.getElementById("form-create-session").addEventListener("submit", handleCreateSession);
       document.getElementById("btn-sync-status").addEventListener("click", doManualSync);
+
+      document.getElementById("btn-add-member-chip").addEventListener("click", function () {
+        if (addMemberName(memberOne.value)) memberOne.value = "";
+        memberOne.focus();
+      });
+      memberOne.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (addMemberName(memberOne.value)) memberOne.value = "";
+        }
+      });
+      document.getElementById("btn-apply-bulk").addEventListener("click", function () {
+        var names = parseNames(bulkInput.value);
+        if (!names.length) {
+          AomUI.toast("ยังไม่มีชื่อในกล่อง");
+          return;
+        }
+        names.forEach(function (n) {
+          addMemberName(n);
+        });
+        bulkInput.value = "";
+        AomUI.toast("เพิ่ม " + names.length + " ชื่อ");
+      });
 
       document.getElementById("btn-export").addEventListener("click", function () {
         try {
