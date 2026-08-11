@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="js/boot.js?v=20260811ux"></script>
+  <script src="js/boot.js?v=20260811s5"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aom Split — จัดการทริป</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=20260811ux">
+  <link rel="stylesheet" href="css/app.css?v=20260811s5">
 </head>
 <body class="has-bottom-nav">
 
@@ -85,41 +85,15 @@
       </div>
     </section>
 
-    <!-- Tab 3: สรุปโอน -->
+    <!-- Tab 3: สรุปโอน — rendered by summary-view.js -->
     <section id="section-summary" class="tab-content">
-      <div class="card">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
-          <div>
-            <h2 style="margin:0;font-size:1.12rem;">ใครต้องโอนใคร</h2>
-            <p class="muted" style="margin:0.3rem 0 0;font-size:0.84rem;">
-              สุทธิ = จ่ายจริง − ส่วนที่ใช้
-            </p>
-          </div>
-          <div id="plan-status-badge"></div>
-        </div>
-        <div id="settle-progress" style="margin-top:0.65rem;"></div>
-        <span id="summary-build-label" class="muted" style="display:none;font-size:0.7rem;"></span>
-      </div>
-
-      <div class="card">
-        <div class="card-h">
-          <h3 style="margin:0;">ยอดต่อคน</h3>
-        </div>
-        <div id="summary-members-list"></div>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin:0.25rem 0.15rem 0.65rem;">
-        <h3 style="margin:0;font-size:1rem;">รายการโอน</h3>
-        <button type="button" class="btn btn-sm btn-ghost" onclick="copyTransfersOnly()">คัดลอก</button>
-      </div>
-      <div id="summary-transfers-list"></div>
-
-      <div class="summary-sticky-actions">
-        <div class="btn-row" style="flex-direction:column;gap:0.4rem;">
-          <button type="button" class="btn btn-primary btn-lg btn-block" onclick="shareSummaryAll()">คัดลอกสรุปไปวางในแชท</button>
-          <button type="button" class="btn btn-block" onclick="copyTransfersOnly()">คัดลอกรายการโอนอย่างเดียว</button>
-        </div>
-      </div>
+      <div id="summary-root" class="summary-root"></div>
+      <!-- legacy hooks (hidden) for older code paths -->
+      <div id="summary-members-list" hidden></div>
+      <div id="summary-transfers-list" hidden></div>
+      <div id="plan-status-badge" hidden></div>
+      <div id="settle-progress" hidden></div>
+      <span id="summary-build-label" hidden></span>
     </section>
   </main>
 
@@ -136,7 +110,7 @@
       </button>
       <button type="button" id="tab-btn-summary" onclick="switchTab('summary')">
         <span class="nav-ico">⇄</span>
-        <span class="nav-lbl">สรุปโอน</span>
+        <span class="nav-lbl">ต้องโอน</span>
       </button>
     </div>
   </nav>
@@ -173,25 +147,25 @@
     <div class="modal" onclick="event.stopPropagation()">
       <div class="modal-handle" aria-hidden="true"></div>
       <div class="card-h">
-        <h3>จ่ายพร้อมเพย์</h3>
+        <h3>สแกนเพื่อโอน</h3>
         <button type="button" class="btn btn-ghost btn-sm" onclick="closePromptPayPay()">✕</button>
       </div>
       <div class="pp-qr-wrap">
         <div style="text-align:center;">
           <div class="muted" style="font-size:0.82rem;">โอนให้</div>
-          <div id="pp-pay-to" style="font-weight:700; font-size:1.1rem;">—</div>
+          <div id="pp-pay-to" style="font-weight:700; font-size:1.2rem;">—</div>
           <div id="pp-pay-id" class="muted" style="font-size:0.8rem; margin-top:0.15rem;">—</div>
         </div>
-        <div class="money big" id="pp-pay-amount">฿0.00</div>
+        <div class="money big" id="pp-pay-amount" style="font-size:1.6rem;">฿0.00</div>
         <div class="pp-qr-box" id="pp-pay-qr"></div>
         <p class="pp-hint">
-          เปิดแอปธนาคาร → สแกน QR นี้<br/>
-          ยอดถูกระบุไว้แล้วตามสรุปโอน
+          1) เปิดแอปธนาคาร<br/>
+          2) สแกน QR นี้ (ยอดใส่ให้แล้ว)<br/>
+          3) กด «โอนแล้ว» ด้านล่าง
         </p>
         <div class="btn-row" style="width:100%; flex-direction:column;">
-          <button type="button" class="btn btn-primary btn-block" onclick="markCurrentPromptPayDone()">✓ โอนแล้ว</button>
-          <button type="button" class="btn btn-block" onclick="copyPromptPayPayload()">คัดลอก payload</button>
-          <button type="button" class="btn btn-ghost btn-block" onclick="closePromptPayPay()">ปิด</button>
+          <button type="button" class="btn btn-primary btn-lg btn-block" onclick="markCurrentPromptPayDone()">✓ โอนแล้ว · ปิด</button>
+          <button type="button" class="btn btn-ghost btn-block" onclick="closePromptPayPay()">ยังไม่โอน · ปิด</button>
         </div>
       </div>
     </div>
@@ -268,12 +242,12 @@
     </div>
   </div>
 
-  <script src="js/money.js?v=20260811ux"></script>
-  <script src="js/store.js?v=20260811ux"></script>
-  <script src="js/ui.js?v=20260811ux"></script>
-  <script src="js/promptpay.js?v=20260811ux"></script>
-  <script src="js/qrcode.min.js?v=20260811ux"></script>
-  <script src="js/summary-view.js?v=20260811ux"></script>
+  <script src="js/money.js?v=20260811s5"></script>
+  <script src="js/store.js?v=20260811s5"></script>
+  <script src="js/ui.js?v=20260811s5"></script>
+  <script src="js/promptpay.js?v=20260811s5"></script>
+  <script src="js/qrcode.min.js?v=20260811s5"></script>
+  <script src="js/summary-view.js?v=20260811s5"></script>
 
   <script>
     // App State
@@ -641,35 +615,17 @@
       }
     }
 
-    function updateSettleProgress(plan) {
-      var box = document.getElementById('settle-progress');
-      if (!box) return;
-      if (!plan || !plan.transfers || !plan.transfers.length) {
-        box.innerHTML = '';
-        return;
-      }
-      var total = plan.transfers.length;
-      var done = 0;
-      plan.transfers.forEach(function (t) {
-        if (AomStore.isTransferMarked && AomStore.isTransferMarked(currentSession, t)) done += 1;
-      });
-      var pct = Math.round((done / total) * 100);
-      box.innerHTML =
-        '<div class="progress-label"><span>โอนแล้ว ' + done + '/' + total + '</span><span>' + pct + '%</span></div>' +
-        '<div class="progress-bar" aria-hidden="true"><i style="width:' + pct + '%"></i></div>';
-    }
-
     function renderSummary() {
       if (!currentSession) return;
+      var root = document.getElementById('summary-root');
       if (!window.AomSummaryView || typeof AomSummaryView.render !== 'function') {
-        var box = document.getElementById('summary-transfers-list');
-        if (box) {
-          box.textContent = 'โหลดโมดูลสรุปไม่สำเร็จ — รีเฟรชหน้า';
-        }
+        if (root) root.textContent = 'โหลดหน้าสรุปไม่สำเร็จ — รีเฟรชหน้า';
         return;
       }
-      lastPlan = AomSummaryView.render({
+
+      var summaryOpts = {
         session: currentSession,
+        root: root,
         membersBox: document.getElementById('summary-members-list'),
         transfersBox: document.getElementById('summary-transfers-list'),
         badgeEl: document.getElementById('plan-status-badge'),
@@ -682,8 +638,15 @@
         },
         onPromptPay: openPromptPayPay,
         onSetupPromptPay: openPromptPaySetup,
-      });
-      updateSettleProgress(lastPlan);
+        onShareAll: shareSummaryAll,
+        onCopyTransfers: copyTransfersOnly,
+        onMeChange: function () {
+          // re-render with same opts (me stored in sessionStorage)
+          lastPlan = AomSummaryView.render(summaryOpts);
+        },
+      };
+
+      lastPlan = AomSummaryView.render(summaryOpts);
     }
 
     /* ───── PromptPay ───── */
@@ -807,12 +770,35 @@
       if (!ppPayContext || !ppPayContext.key) return;
       toggleTransferDone(ppPayContext.key, true);
       closePromptPayPay();
+      AomUI.toast('บันทึกว่าโอนแล้ว');
     }
 
     function shareSummaryAll() {
       try {
         const plan = AomMoney.recompute(currentSession);
-        AomUI.copyText(AomUI.buildShareText(currentSession, plan));
+        var text = AomUI.buildShareText(currentSession, plan);
+        // ถ้าเลือก "ฉันคือ" แล้ว — ใส่ท่อนงานของฉันด้านบน
+        var meId = AomSummaryView.getMeId && AomSummaryView.getMeId(currentSession.id);
+        if (meId && plan.transfers && plan.transfers.length) {
+          var meName = AomUI.memberName(currentSession, meId);
+          var mine = plan.transfers.filter(function (t) {
+            return t.from === meId && !(AomStore.isTransferMarked && AomStore.isTransferMarked(currentSession, t));
+          });
+          if (mine.length) {
+            var head = ['📌 ' + meName + ' ต้องโอน:'];
+            mine.forEach(function (t) {
+              head.push(
+                '• → ' +
+                  AomUI.memberName(currentSession, t.to) +
+                  ' ' +
+                  AomMoney.formatMoney(t.amountMinor)
+              );
+            });
+            head.push('');
+            text = head.join('\n') + text;
+          }
+        }
+        AomUI.copyText(text);
       } catch (err) {
         AomUI.toast((err && err.message) || 'แชร์ไม่สำเร็จ');
       }
@@ -825,16 +811,30 @@
           AomUI.copyText('✅ ลงตัวแล้ว ไม่ต้องโอนเพิ่ม');
           return;
         }
-        const lines = plan.transfers.map(function (t) {
-          return (
+        var meId = AomSummaryView.getMeId && AomSummaryView.getMeId(currentSession.id);
+        var list = plan.transfers;
+        var title = '— รายการโอน —';
+        if (meId) {
+          var mine = plan.transfers.filter(function (t) { return t.from === meId; });
+          if (mine.length) {
+            list = mine;
+            title = '— ' + AomUI.memberName(currentSession, meId) + ' ต้องโอน —';
+          }
+        }
+        const lines = list.map(function (t) {
+          var line =
             AomUI.memberName(currentSession, t.from) +
             ' → ' +
             AomUI.memberName(currentSession, t.to) +
             ' ' +
-            AomMoney.formatMoney(t.amountMinor)
-          );
+            AomMoney.formatMoney(t.amountMinor);
+          var toM = (currentSession.members || []).find(function (m) { return m.id === t.to; });
+          if (toM && AomPromptPay && AomPromptPay.memberHasPromptPay(toM)) {
+            line += ' (พร้อมเพย์ ' + AomPromptPay.maskId(AomPromptPay.memberPromptPay(toM)) + ')';
+          }
+          return line;
         });
-        AomUI.copyText('— รายการโอน —\n' + lines.join('\n'));
+        AomUI.copyText(title + '\n' + lines.join('\n'));
       } catch (err) {
         AomUI.toast((err && err.message) || 'คัดลอกไม่สำเร็จ');
       }
@@ -845,12 +845,20 @@
         const plan = AomMoney.recompute(currentSession);
         const t = plan.transfers[idx];
         if (!t) return;
-        const text =
+        var toM = (currentSession.members || []).find(function (m) { return m.id === t.to; });
+        var text =
           AomUI.memberName(currentSession, t.from) +
           ' โอนให้ ' +
           AomUI.memberName(currentSession, t.to) +
           ' ' +
           AomMoney.formatMoney(t.amountMinor);
+        if (toM && AomPromptPay && AomPromptPay.memberHasPromptPay(toM)) {
+          text +=
+            '\nพร้อมเพย์: ' +
+            AomPromptPay.memberPromptPay(toM) +
+            ' · ยอด ' +
+            AomMoney.formatMoney(t.amountMinor);
+        }
         AomUI.copyText(text);
       } catch (err) {
         AomUI.toast('คัดลอกไม่สำเร็จ');
@@ -863,7 +871,7 @@
         const fresh = AomStore.getSession(currentSession.id);
         if (fresh) currentSession = fresh;
         renderSummary();
-        AomUI.toast(done ? 'ติ๊กโอนแล้ว' : 'ยกเลิกเครื่องหมาย');
+        AomUI.toast(done ? '✓ บันทึกว่าโอนแล้ว' : 'ยกเลิกเครื่องหมายแล้ว');
       } catch (err) {
         AomUI.toast((err && err.message) || 'บันทึกไม่สำเร็จ');
       }

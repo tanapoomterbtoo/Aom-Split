@@ -1,4 +1,4 @@
-/* Aom Split — mobile-first UX (build 20260811ux) */
+/* Aom Split — mobile-first UX (build 20260811s5) */
 :root {
   --bg: #0b1220;
   --bg-card: #121a2b;
@@ -1272,44 +1272,350 @@ button.save-pill:focus-visible { outline: none; box-shadow: var(--focus); }
   font-weight: 600;
 }
 
-/* Transfer card redesign */
-.transfer-card {
-  border-left: 4px solid var(--accent);
-  padding: 1rem 1.05rem;
+/* ── Settle / summary tab (20260811s5) ── */
+.summary-root {
+  padding-bottom: 0.5rem;
 }
-.transfer-card.done {
-  opacity: 0.7;
-  border-left-color: var(--good);
+
+.settle-me-card {
+  padding: 0.85rem 0.95rem;
 }
-.transfer-card .xfer-amount {
-  font-family: var(--mono);
-  font-size: 1.55rem;
+.settle-me-label {
+  font-size: 0.82rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0.35rem 0 0.7rem;
-  line-height: 1.15;
+  color: var(--muted);
+  margin-bottom: 0.55rem;
+  letter-spacing: 0.01em;
 }
-.transfer-card .xfer-who {
+.settle-me-row {
   display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.15rem;
+  scrollbar-width: none;
+}
+.settle-me-row::-webkit-scrollbar { display: none; }
+.settle-me-chip {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-weight: 700;
-  flex-wrap: wrap;
-  font-size: 0.95rem;
+  min-height: 42px;
+  padding: 0.4rem 0.75rem 0.4rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.transfer-card .xfer-actions {
+.settle-me-chip.on {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: var(--accent-soft);
+  color: var(--info);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+.settle-me-all-ico {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+.settle-me-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.settle-hero {
+  text-align: left;
+  padding: 1rem 1.05rem 0.95rem;
+  background:
+    linear-gradient(145deg, rgba(59, 130, 246, 0.14), transparent 55%),
+    var(--bg-card);
+  border-color: rgba(59, 130, 246, 0.28);
+}
+.settle-hero.is-done {
+  background:
+    linear-gradient(145deg, rgba(34, 197, 94, 0.12), transparent 55%),
+    var(--bg-card);
+  border-color: rgba(34, 197, 94, 0.28);
+}
+.settle-hero.is-recv {
+  background:
+    linear-gradient(145deg, rgba(34, 197, 94, 0.1), transparent 55%),
+    var(--bg-card);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+.settle-hero-kicker {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.25rem;
+}
+.settle-hero-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text);
+}
+.settle-hero-title.money {
+  font-family: var(--mono);
+  font-size: 1.85rem;
+}
+.settle-hero-sub {
+  margin-top: 0.25rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.settle-progress {
+  margin-top: 0.75rem;
+}
+
+.settle-quick-actions {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
 }
-.transfer-card .xfer-actions .btn-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
+
+.settle-section-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.35rem 0.1rem 0.55rem;
 }
-.transfer-card .xfer-actions .btn-primary {
-  min-height: 48px;
+.settle-section-h h3 {
+  margin: 0;
   font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.settle-empty-soft {
+  text-align: center;
+  padding: 1rem;
+  margin-bottom: 0.7rem;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.92rem;
+  background: var(--bg-soft);
+}
+
+.settle-done-card .settle-done-ico {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 0.55rem;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--good);
+  background: var(--good-soft);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Transfer action cards */
+.settle-xfer {
+  border-left: 4px solid var(--accent);
+  padding: 1rem 1.05rem;
+  margin-bottom: 0.7rem;
+}
+.settle-xfer.is-mine {
+  border-left-color: var(--warn);
+  background:
+    linear-gradient(90deg, rgba(245, 158, 11, 0.06), transparent 40%),
+    var(--bg-card);
+}
+.settle-xfer.is-recv {
+  border-left-color: var(--good);
+}
+.settle-xfer.is-done {
+  opacity: 0.72;
+  border-left-color: var(--good);
+}
+.settle-xfer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+.settle-xfer-verb {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.3rem;
+}
+.settle-xfer-who {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.08rem;
+  min-width: 0;
+}
+.settle-xfer-who strong {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settle-xfer-both {
+  flex-wrap: wrap;
+  font-size: 0.98rem;
+  row-gap: 0.25rem;
+}
+.settle-arrow {
+  color: var(--muted);
+  font-weight: 700;
+  padding: 0 0.1rem;
+}
+.settle-xfer-amt {
+  font-family: var(--mono);
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0.15rem 0 0.55rem;
+}
+.settle-xfer-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: -0.2rem 0 0.65rem;
+  line-height: 1.35;
+}
+.settle-xfer-meta.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.settle-xfer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.settle-xfer-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 0.4rem;
+}
+.settle-xfer-secondary .btn {
+  min-height: 46px;
+}
+
+/* Collapsible sections */
+.settle-details {
+  margin: 0.55rem 0 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+.settle-details > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: var(--touch);
+  user-select: none;
+}
+.settle-details > summary::-webkit-details-marker { display: none; }
+.settle-details > summary::after {
+  content: "▾";
+  color: var(--muted);
+  font-size: 0.9rem;
+  transition: transform 0.15s ease;
+}
+.settle-details[open] > summary::after {
+  transform: rotate(180deg);
+}
+.settle-details-body {
+  padding: 0 0.75rem 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.settle-details-body .settle-xfer {
+  margin-top: 0.65rem;
+}
+.settle-details-body .settle-xfer:first-child {
+  margin-top: 0.65rem;
+}
+
+/* Balances list */
+.settle-bal-list {
+  padding-top: 0.35rem;
+}
+.settle-bal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.7rem 0.15rem;
+  border-bottom: 1px solid var(--border);
+}
+.settle-bal-row:last-child { border-bottom: none; }
+.settle-bal-row.is-me {
+  background: var(--accent-soft);
+  margin: 0 -0.35rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  border-radius: 10px;
+  border-bottom-color: transparent;
+}
+.settle-bal-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.settle-bal-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.settle-bal-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+.settle-bal-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+.settle-bal-right .money {
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+.settle-bal-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+
+/* sticky share inside summary root */
+.summary-root .summary-sticky-actions {
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 /* Advanced split (progressive disclosure) */
@@ -1394,9 +1700,12 @@ button.save-pill:focus-visible { outline: none; box-shadow: var(--focus); }
   .how-steps {
     grid-template-columns: 1fr 1fr 1fr;
   }
-  .transfer-card .xfer-actions {
-    grid-template-columns: 1.4fr 1fr;
-    align-items: center;
+  .settle-xfer-secondary {
+    grid-template-columns: 1fr 1.2fr;
+  }
+  .settle-me-row {
+    flex-wrap: wrap;
+    overflow: visible;
   }
 }
 
